@@ -28,9 +28,9 @@ body::before {
   inset: 0;
   pointer-events: none;
   z-index: -1;
-  opacity: 0.3;
+  opacity: 0.18;
   background-image: radial-gradient(rgba(255,255,255,0.22) 0.55px, transparent 0.7px);
-  background-size: 5px 5px;
+  background-size: 7px 7px;
   mask-image: linear-gradient(to bottom, rgba(0,0,0,0.3), transparent 70%);
 }
 
@@ -50,7 +50,7 @@ a {
     linear-gradient(145deg, rgba(255, 255, 255, 0.105), rgba(255, 255, 255, 0.045)),
     linear-gradient(180deg, rgba(155, 124, 255, 0.055), rgba(88, 240, 209, 0.025));
   box-shadow: 0 24px 90px rgba(0, 0, 0, 0.34), inset 0 1px 0 rgba(255, 255, 255, 0.1), inset 0 -1px 0 rgba(88, 240, 209, 0.035);
-  backdrop-filter: blur(22px) saturate(130%);
+  backdrop-filter: blur(14px) saturate(118%);
 }
 
 .glow-card {
@@ -109,9 +109,10 @@ a {
 .aurora-orb {
   position: absolute;
   border-radius: 9999px;
-  filter: blur(46px);
-  opacity: 0.42;
-  animation: aurora-float 14s ease-in-out infinite alternate;
+  filter: blur(36px);
+  opacity: 0.32;
+  will-change: transform;
+  animation: aurora-float 20s ease-in-out infinite alternate;
 }
 
 @keyframes aurora-float {
@@ -407,4 +408,13 @@ a {
 .soft-scrollbar::-webkit-scrollbar-thumb {
   background: rgba(255, 255, 255, 0.16);
   border-radius: 999px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    scroll-behavior: auto !important;
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+  }
 }
