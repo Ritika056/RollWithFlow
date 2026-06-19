@@ -1,0 +1,39 @@
+from app.models.associations import crate_songs, playlist_songs, song_folders, song_sources, song_tags
+from app.models.auth import User
+from app.models.music import (
+    Album,
+    Artist,
+    Crate,
+    DiscoveryItem,
+    DiscoveryType,
+    Folder,
+    Genre,
+    Mix,
+    Playlist,
+    Song,
+    Source,
+    SourceType,
+    Tag,
+)
+
+__all__ = [
+    "Album",
+    "Artist",
+    "Crate",
+    "DiscoveryItem",
+    "DiscoveryType",
+    "Folder",
+    "Genre",
+    "Mix",
+    "Playlist",
+    "Song",
+    "Source",
+    "SourceType",
+    "Tag",
+    "User",
+    "crate_songs",
+    "playlist_songs",
+    "song_folders",
+    "song_sources",
+    "song_tags",
+]
