@@ -22,6 +22,11 @@ class Settings(BaseSettings):
 
     @model_validator(mode="after")
     def require_production_secret(self) -> "Settings":
+        # Render supplies a standard postgresql:// URL. Use the installed
+        # psycopg v3 driver instead of SQLAlchemy's legacy psycopg2 default.
+        if self.database_url.startswith("postgresql://"):
+            self.database_url = self.database_url.replace("postgresql://", "postgresql+psycopg://", 1)
+
         if self.environment.lower() in {"production", "prod"}:
             if self.secret_key == "change-me-before-production" or len(self.secret_key) < 32:
                 raise ValueError("SECRET_KEY must be a strong value of at least 32 characters in production.")
