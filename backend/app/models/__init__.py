@@ -1,5 +1,5 @@
 from app.models.associations import crate_songs, playlist_songs, song_folders, song_sources, song_tags
-from app.models.auth import User
+from app.models.auth import ProviderConnection, User
 from app.models.music import (
     Album,
     Artist,
@@ -26,6 +26,7 @@ __all__ = [
     "Genre",
     "Mix",
     "Playlist",
+    "ProviderConnection",
     "Song",
     "Source",
     "SourceType",

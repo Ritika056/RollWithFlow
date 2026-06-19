@@ -12,6 +12,8 @@ import type {
   Song,
   SongPayload,
   LoginResponse,
+  ProviderSearchResponse,
+  ProviderStatus,
 } from "@/types/api";
 
 export const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://127.0.0.1:8000";
@@ -103,3 +105,7 @@ export const saveDiscoveryToLibrary = (id: number) => apiPost<Song>(`/api/discov
 export const rejectDiscovery = (id: number) => apiPost<{ status: string }>(`/api/discovery/${id}/reject`);
 export const restoreDiscovery = (id: number) => apiPost<DiscoveryItem>(`/api/discovery/${id}/restore`);
 export const mockDailyFetch = () => apiPost<DiscoveryItem[]>("/api/discovery/mock-daily-fetch");
+export const getProviderStatus = () => apiGet<ProviderStatus>("/api/providers/status");
+export const getSpotifyConnectUrl = () => apiGet<{ authorization_url: string }>("/api/providers/spotify/connect");
+export const searchSpotify = (query: string) => apiPost<ProviderSearchResponse>("/api/providers/spotify/search", { query });
+export const searchYouTube = (query: string) => apiPost<ProviderSearchResponse>("/api/providers/youtube/search", { query });

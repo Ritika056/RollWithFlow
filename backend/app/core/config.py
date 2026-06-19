@@ -19,6 +19,10 @@ class Settings(BaseSettings):
     admin_email: str | None = None
     admin_password: str | None = None
     admin_display_name: str = "RollWithFlow Admin"
+    spotify_client_id: str | None = None
+    spotify_client_secret: str | None = None
+    spotify_redirect_uri: str | None = None
+    youtube_api_key: str | None = None
 
     @model_validator(mode="after")
     def require_production_secret(self) -> "Settings":

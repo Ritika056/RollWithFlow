@@ -1,7 +1,7 @@
 from datetime import datetime
 from typing import Any
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class ORMBase(BaseModel):
@@ -223,3 +223,42 @@ class DiscoveryItemWrite(BaseModel):
     discovery_type: str = "manual_search"
     popularity_score: float | None = None
     metadata_json: dict[str, Any] | None = None
+
+
+class SpotifyProviderStatus(BaseModel):
+    configured: bool
+    connected: bool
+
+
+class YouTubeProviderStatus(BaseModel):
+    configured: bool
+
+
+class ProviderStatusRead(BaseModel):
+    spotify: SpotifyProviderStatus
+    youtube: YouTubeProviderStatus
+
+
+class ProviderSearchRequest(BaseModel):
+    query: str = Field(min_length=1, max_length=200)
+    limit: int = Field(default=10, ge=1, le=25)
+
+
+class ProviderSearchItem(BaseModel):
+    title: str
+    artist_name: str | None = None
+    platform: str
+    source_url: str | None = None
+    thumbnail_url: str | None = None
+    discovery_type: str = "manual_search"
+    popularity_score: float | None = None
+    metadata_json: dict[str, Any] | None = None
+
+
+class ProviderSearchResponse(BaseModel):
+    provider: str
+    results: list[ProviderSearchItem]
+
+
+class SpotifyConnectResponse(BaseModel):
+    authorization_url: str

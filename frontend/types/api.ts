@@ -162,3 +162,24 @@ export type DiscoveryItem = {
   is_rejected: boolean;
   metadata_json?: Record<string, unknown> | null;
 };
+
+export type ProviderStatus = {
+  spotify: { configured: boolean; connected: boolean };
+  youtube: { configured: boolean };
+};
+
+export type ProviderSearchItem = {
+  title: string;
+  artist_name?: string | null;
+  platform: string;
+  source_url?: string | null;
+  thumbnail_url?: string | null;
+  discovery_type: string;
+  popularity_score?: number | null;
+  metadata_json?: Record<string, unknown> | null;
+};
+
+export type ProviderSearchResponse = {
+  provider: string;
+  results: ProviderSearchItem[];
+};
