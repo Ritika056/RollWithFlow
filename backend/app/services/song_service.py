@@ -1,3 +1,5 @@
+from pathlib import Path
+
 from sqlalchemy import select
 from sqlalchemy.orm import Session, selectinload
 
@@ -35,6 +37,8 @@ def source_type_from_value(value: str | None) -> SourceType:
 def attach_source(db: Session, song: Song, source_type: str | None, source_url: str | None) -> None:
     source_enum = source_type_from_value(source_type)
     url = normalize_text(source_url)
+    if source_enum == SourceType.local and url:
+        url = Path(url).expanduser().resolve(strict=False).as_posix()
     source_name = f"{source_enum.value.title()} Source"
     existing = db.scalar(
         select(Source).where(

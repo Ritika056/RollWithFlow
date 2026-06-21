@@ -6,6 +6,7 @@ import { usePathname } from "next/navigation";
 import { Sidebar } from "@/components/layout/Sidebar";
 import { TopHeader } from "@/components/layout/TopHeader";
 import { MiniPlayer } from "@/components/player/MiniPlayer";
+import { PlayerProvider } from "@/components/player/PlayerProvider";
 
 export function AppShell({ children }: { children: ReactNode }) {
   const pathname = usePathname();
@@ -21,6 +22,7 @@ export function AppShell({ children }: { children: ReactNode }) {
   }
 
   return (
+    <PlayerProvider>
     <div className="relative flex min-h-screen text-white">
       <AppBackdrop />
       <div className="hidden lg:block">
@@ -37,6 +39,7 @@ export function AppShell({ children }: { children: ReactNode }) {
         <MiniPlayer />
       </div>
     </div>
+    </PlayerProvider>
   );
 }
 

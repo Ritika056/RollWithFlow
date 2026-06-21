@@ -4,6 +4,7 @@ import { Badge } from "@/components/ui/Badge";
 import { GlassCard } from "@/components/ui/GlassCard";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { LocalLibraryScanPanel } from "@/components/settings/LocalLibraryScanPanel";
+import { LocalFileHealthPanel } from "@/components/settings/LocalFileHealthPanel";
 
 const settings = [
   ["Local library scan path", "Folder scanning lands in a later phase.", HardDrive, "Phase 3/4"],
@@ -19,6 +20,7 @@ export default function SettingsPage() {
     <section className="space-y-7">
       <PageHeader eyebrow="Control Room" title="Settings" description="Local scanning is available. External connections remain intentionally inactive." />
       <LocalLibraryScanPanel />
+      <LocalFileHealthPanel />
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
         {settings.map(([title, description, Icon, phase]) => (
           <GlassCard key={title} className="p-5">

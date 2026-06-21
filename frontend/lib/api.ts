@@ -1,10 +1,12 @@
 import type {
   DashboardSummary,
   AuthUser,
+  AudioUploadResult,
   DiscoveryItem,
   Folder,
   FolderPayload,
   LibraryScanResult,
+  LocalFileHealthResult,
   Crate,
   Mix,
   Playlist,
@@ -14,6 +16,8 @@ import type {
   LoginResponse,
   ProviderSearchResponse,
   ProviderStatus,
+  DiscoveryFetchRun,
+  DiscoveryMonitor,
 } from "@/types/api";
 
 export const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://127.0.0.1:8000";
@@ -62,6 +66,24 @@ export const login = (email: string, password: string) => apiPost<LoginResponse>
 export const getCurrentUser = () => apiGet<AuthUser>("/api/auth/me");
 export const logout = () => apiPost<{ status: string }>("/api/auth/logout");
 export const scanLibraryFolder = (folderPath: string) => apiPost<LibraryScanResult>("/api/library/scan-folder", { folder_path: folderPath });
+export async function uploadAudioFiles(files: File[]): Promise<ApiResult<AudioUploadResult>> {
+  try {
+    const token = getBrowserToken();
+    const form = new FormData();
+    files.forEach((file) => form.append("files", file));
+    const response = await fetch(`${API_BASE_URL}/api/library/upload-audio`, {
+      method: "POST", credentials: "include", body: form,
+      headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+    });
+    if (!response.ok) return { data: null, error: (await response.text()) || `Backend returned ${response.status}` };
+    return { data: await response.json() as AudioUploadResult, error: null };
+  } catch {
+    return { data: null, error: "Audio import could not reach the local backend." };
+  }
+}
+export const checkLocalFiles = () => apiPost<LocalFileHealthResult>("/api/library/check-files");
+export const repairLocalPath = (id: number, newFilePath: string) => apiPost<Song>(`/api/songs/${id}/repair-local-path`, { new_file_path: newFilePath });
+export const rescanSongMetadata = (id: number, overwrite = false) => apiPost<Song>(`/api/songs/${id}/rescan-metadata`, { overwrite });
 export const getSongs = (query = "") => apiGet<Song[]>(`/api/songs${query}`);
 export const getLikedSongs = () => apiGet<Song[]>("/api/liked-songs");
 export const getFolders = () => apiGet<Folder[]>("/api/folders");
@@ -109,3 +131,8 @@ export const getProviderStatus = () => apiGet<ProviderStatus>("/api/providers/st
 export const getSpotifyConnectUrl = () => apiGet<{ authorization_url: string }>("/api/providers/spotify/connect");
 export const searchSpotify = (query: string) => apiPost<ProviderSearchResponse>("/api/providers/spotify/search", { query });
 export const searchYouTube = (query: string) => apiPost<ProviderSearchResponse>("/api/providers/youtube/search", { query });
+export const createDiscoveryMonitor = (payload: Partial<DiscoveryMonitor>) => apiPost<DiscoveryMonitor>("/api/discovery/monitors", payload);
+export const updateDiscoveryMonitor = (id: number, payload: Partial<DiscoveryMonitor>) => apiPatch<DiscoveryMonitor>(`/api/discovery/monitors/${id}`, payload);
+export const deleteDiscoveryMonitor = (id: number) => apiDelete<{ status: string }>(`/api/discovery/monitors/${id}`);
+export const runDiscoveryFetch = (provider?: string) => apiPost<DiscoveryFetchRun[]>("/api/discovery/run-fetch", provider ? { provider } : {});
+export const runLocalDailyFetch = () => apiPost<DiscoveryFetchRun[]>("/api/discovery/run-local-daily-fetch");

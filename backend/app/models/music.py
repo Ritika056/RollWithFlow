@@ -184,9 +184,37 @@ class DiscoveryItem(TimestampMixin, Base):
     platform: Mapped[str] = mapped_column(String(80), index=True, nullable=False)
     source_url: Mapped[str | None] = mapped_column(Text, nullable=True)
     thumbnail_url: Mapped[str | None] = mapped_column(Text, nullable=True)
-    discovery_type: Mapped[DiscoveryType] = mapped_column(Enum(DiscoveryType), nullable=False)
+    discovery_type: Mapped[DiscoveryType] = mapped_column(Enum(DiscoveryType), default=DiscoveryType.manual_search, nullable=False)
     popularity_score: Mapped[float | None] = mapped_column(Float, nullable=True)
     fetched_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(UTC), nullable=False)
     is_saved: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     is_rejected: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    metadata_json: Mapped[dict[str, Any] | None] = mapped_column(JSON, nullable=True)
+
+
+class DiscoveryMonitor(TimestampMixin, Base):
+    __tablename__ = "discovery_monitors"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    name: Mapped[str] = mapped_column(String(180), nullable=False)
+    provider: Mapped[str] = mapped_column(String(80), index=True, nullable=False, default="mock")
+    monitor_type: Mapped[str] = mapped_column(String(80), nullable=False, default="query")
+    query: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    genre: Mapped[str | None] = mapped_column(String(120), nullable=True)
+    artist_name: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+
+
+class DiscoveryFetchRun(Base):
+    __tablename__ = "discovery_fetch_runs"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    provider: Mapped[str] = mapped_column(String(80), index=True, nullable=False)
+    run_type: Mapped[str] = mapped_column(String(80), nullable=False)
+    status: Mapped[str] = mapped_column(String(80), nullable=False)
+    started_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(UTC), nullable=False)
+    finished_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    items_found: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    items_saved: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    error_message: Mapped[str | None] = mapped_column(Text, nullable=True)
     metadata_json: Mapped[dict[str, Any] | None] = mapped_column(JSON, nullable=True)

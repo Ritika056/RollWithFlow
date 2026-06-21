@@ -112,6 +112,38 @@ class LibraryScanResult(BaseModel):
     errors: list[str] = []
 
 
+class AudioUploadResult(BaseModel):
+    uploaded_count: int
+    created_count: int
+    skipped_count: int
+    errors: list[str] = []
+    created_songs: list[SongRead] = []
+
+
+class LocalFileMissingRead(BaseModel):
+    id: int
+    title: str
+    artist_name: str | None = None
+    source_name: str | None = None
+    status: str
+
+
+class LocalFileHealthResult(BaseModel):
+    checked_count: int
+    ok_count: int
+    missing_count: int
+    error_count: int
+    missing_songs: list[LocalFileMissingRead] = []
+
+
+class RepairLocalPathRequest(BaseModel):
+    new_file_path: str
+
+
+class RescanMetadataRequest(BaseModel):
+    overwrite: bool = False
+
+
 class FolderWrite(BaseModel):
     name: str
     description: str | None = None
@@ -262,3 +294,53 @@ class ProviderSearchResponse(BaseModel):
 
 class SpotifyConnectResponse(BaseModel):
     authorization_url: str
+
+
+class DiscoveryMonitorWrite(BaseModel):
+    name: str = Field(min_length=1, max_length=180)
+    provider: str = "mock"
+    monitor_type: str = "query"
+    query: str | None = None
+    genre: str | None = None
+    artist_name: str | None = None
+    is_active: bool = True
+
+
+class DiscoveryMonitorUpdate(BaseModel):
+    name: str | None = None
+    provider: str | None = None
+    monitor_type: str | None = None
+    query: str | None = None
+    genre: str | None = None
+    artist_name: str | None = None
+    is_active: bool | None = None
+
+
+class DiscoveryMonitorRead(ORMBase):
+    id: int
+    name: str
+    provider: str
+    monitor_type: str
+    query: str | None = None
+    genre: str | None = None
+    artist_name: str | None = None
+    is_active: bool
+    created_at: datetime
+    updated_at: datetime
+
+
+class DiscoveryFetchRunRead(ORMBase):
+    id: int
+    provider: str
+    run_type: str
+    status: str
+    started_at: datetime
+    finished_at: datetime | None = None
+    items_found: int
+    items_saved: int
+    error_message: str | None = None
+    metadata_json: dict[str, Any] | None = None
+
+
+class DiscoveryRunFetchRequest(BaseModel):
+    provider: str | None = None

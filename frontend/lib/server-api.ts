@@ -3,7 +3,7 @@ import "server-only";
 import { cookies } from "next/headers";
 
 import { API_BASE_URL, type ApiResult } from "@/lib/api";
-import type { Crate, DashboardSummary, DiscoveryItem, Folder, Mix, Playlist, PlaylistSong, ProviderStatus, Song } from "@/types/api";
+import type { Crate, DashboardSummary, DiscoveryFetchRun, DiscoveryItem, DiscoveryMonitor, Folder, Mix, Playlist, PlaylistSong, ProviderStatus, Song } from "@/types/api";
 
 async function serverGet<T>(path: string): Promise<ApiResult<T>> {
   const token = (await cookies()).get("rwf_token")?.value;
@@ -36,3 +36,5 @@ export const getMixes = () => serverGet<Mix[]>("/api/mixes");
 export const getMix = (id: number) => serverGet<Mix>(`/api/mixes/${id}`);
 export const getDiscovery = () => serverGet<DiscoveryItem[]>("/api/discovery");
 export const getProviderStatus = () => serverGet<ProviderStatus>("/api/providers/status");
+export const getDiscoveryMonitors = () => serverGet<DiscoveryMonitor[]>("/api/discovery/monitors");
+export const getDiscoveryFetchRuns = () => serverGet<DiscoveryFetchRun[]>("/api/discovery/fetch-runs");

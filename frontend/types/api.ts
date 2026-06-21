@@ -7,6 +7,30 @@ export type LibraryScanResult = {
   errors: string[];
 };
 
+export type AudioUploadResult = {
+  uploaded_count: number;
+  created_count: number;
+  skipped_count: number;
+  errors: string[];
+  created_songs: Song[];
+};
+
+export type LocalFileMissing = {
+  id: number;
+  title: string;
+  artist_name?: string | null;
+  source_name?: string | null;
+  status: string;
+};
+
+export type LocalFileHealthResult = {
+  checked_count: number;
+  ok_count: number;
+  missing_count: number;
+  error_count: number;
+  missing_songs: LocalFileMissing[];
+};
+
 export type AuthUser = {
   id: number;
   email: string;
@@ -182,4 +206,30 @@ export type ProviderSearchItem = {
 export type ProviderSearchResponse = {
   provider: string;
   results: ProviderSearchItem[];
+};
+
+export type DiscoveryMonitor = {
+  id: number;
+  name: string;
+  provider: "mock" | "spotify" | "youtube";
+  monitor_type: "genre" | "artist" | "query" | "trending" | "latest";
+  query?: string | null;
+  genre?: string | null;
+  artist_name?: string | null;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+};
+
+export type DiscoveryFetchRun = {
+  id: number;
+  provider: string;
+  run_type: string;
+  status: "success" | "partial" | "failed" | "skipped";
+  started_at: string;
+  finished_at?: string | null;
+  items_found: number;
+  items_saved: number;
+  error_message?: string | null;
+  metadata_json?: Record<string, unknown> | null;
 };

@@ -3,9 +3,19 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
-from app.models import DiscoveryItem
-from app.schemas.common import DiscoveryItemRead, DiscoveryItemWrite, SongRead
-from app.services.discovery_service import apply_discovery, run_mock_daily_discovery_fetch, save_discovery_to_library
+from app.api.dependencies import get_current_active_user
+from app.models import DiscoveryFetchRun, DiscoveryItem, DiscoveryMonitor, User
+from app.schemas.common import (
+    DiscoveryFetchRunRead,
+    DiscoveryItemRead,
+    DiscoveryItemWrite,
+    DiscoveryMonitorRead,
+    DiscoveryMonitorUpdate,
+    DiscoveryMonitorWrite,
+    DiscoveryRunFetchRequest,
+    SongRead,
+)
+from app.services.discovery_service import apply_discovery, run_local_daily_discovery_fetch, run_mock_daily_discovery_fetch, save_discovery_to_library
 
 router = APIRouter(prefix="/api/discovery", tags=["discovery"])
 
@@ -78,3 +88,54 @@ def restore_item(item_id: int, db: Session = Depends(get_db)):
 @router.post("/mock-daily-fetch", response_model=list[DiscoveryItemRead])
 def mock_daily_fetch(db: Session = Depends(get_db)):
     return run_mock_daily_discovery_fetch(db)
+
+
+@router.get("/monitors", response_model=list[DiscoveryMonitorRead])
+def list_monitors(db: Session = Depends(get_db)):
+    return list(db.scalars(select(DiscoveryMonitor).order_by(DiscoveryMonitor.is_active.desc(), DiscoveryMonitor.id.desc())).all())
+
+
+@router.post("/monitors", response_model=DiscoveryMonitorRead, status_code=201)
+def create_monitor(payload: DiscoveryMonitorWrite, db: Session = Depends(get_db)):
+    monitor = DiscoveryMonitor(**payload.model_dump())
+    db.add(monitor)
+    db.commit()
+    db.refresh(monitor)
+    return monitor
+
+
+@router.patch("/monitors/{monitor_id}", response_model=DiscoveryMonitorRead)
+def update_monitor(monitor_id: int, payload: DiscoveryMonitorUpdate, db: Session = Depends(get_db)):
+    monitor = db.get(DiscoveryMonitor, monitor_id)
+    if not monitor:
+        raise HTTPException(status_code=404, detail="Discovery monitor not found")
+    for name, value in payload.model_dump(exclude_unset=True).items():
+        setattr(monitor, name, value)
+    db.commit()
+    db.refresh(monitor)
+    return monitor
+
+
+@router.delete("/monitors/{monitor_id}")
+def delete_monitor(monitor_id: int, db: Session = Depends(get_db)):
+    monitor = db.get(DiscoveryMonitor, monitor_id)
+    if not monitor:
+        raise HTTPException(status_code=404, detail="Discovery monitor not found")
+    db.delete(monitor)
+    db.commit()
+    return {"status": "deleted"}
+
+
+@router.get("/fetch-runs", response_model=list[DiscoveryFetchRunRead])
+def list_fetch_runs(db: Session = Depends(get_db)):
+    return list(db.scalars(select(DiscoveryFetchRun).order_by(DiscoveryFetchRun.started_at.desc(), DiscoveryFetchRun.id.desc()).limit(20)).all())
+
+
+@router.post("/run-fetch", response_model=list[DiscoveryFetchRunRead])
+def run_fetch(payload: DiscoveryRunFetchRequest, current_user: User = Depends(get_current_active_user), db: Session = Depends(get_db)):
+    return run_local_daily_discovery_fetch(db, current_user.id, provider=payload.provider, run_type="manual")
+
+
+@router.post("/run-local-daily-fetch", response_model=list[DiscoveryFetchRunRead])
+def run_local_daily_fetch(current_user: User = Depends(get_current_active_user), db: Session = Depends(get_db)):
+    return run_local_daily_discovery_fetch(db, current_user.id, run_type="local_daily")

@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Image from "next/image";
 import { ExternalLink, Link2, Music2, Plus, Radio, RefreshCw, Save, Search, Trash2, Undo2 } from "lucide-react";
 
@@ -10,13 +10,13 @@ import { GlassCard } from "@/components/ui/GlassCard";
 import { Modal } from "@/components/ui/Modal";
 import { SearchInput } from "@/components/ui/SearchInput";
 import { Toast } from "@/components/ui/Toast";
-import { createDiscovery, getSpotifyConnectUrl, mockDailyFetch, rejectDiscovery, restoreDiscovery, saveDiscoveryToLibrary, searchSpotify, searchYouTube } from "@/lib/api";
-import type { DiscoveryItem, ProviderSearchItem, ProviderStatus } from "@/types/api";
+import { createDiscovery, createDiscoveryMonitor, deleteDiscoveryMonitor, getProviderStatus, getSpotifyConnectUrl, mockDailyFetch, rejectDiscovery, restoreDiscovery, runDiscoveryFetch, runLocalDailyFetch, saveDiscoveryToLibrary, searchSpotify, searchYouTube, updateDiscoveryMonitor } from "@/lib/api";
+import type { DiscoveryFetchRun, DiscoveryItem, DiscoveryMonitor, ProviderSearchItem, ProviderStatus } from "@/types/api";
 
 const tabs = ["manual_search", "trending", "latest", "history", "artist_monitoring", "genre_monitoring", "settings"];
 type ProviderChoice = "mock" | "spotify" | "youtube";
 
-export function DiscoveryManager({ items, providerStatus: initialProviderStatus }: { items: DiscoveryItem[]; providerStatus: ProviderStatus }) {
+export function DiscoveryManager({ items, monitors: initialMonitors, fetchRuns: initialFetchRuns, providerStatus: initialProviderStatus }: { items: DiscoveryItem[]; monitors: DiscoveryMonitor[]; fetchRuns: DiscoveryFetchRun[]; providerStatus: ProviderStatus }) {
   const [list, setList] = useState(items);
   const [tab, setTab] = useState("history");
   const [search, setSearch] = useState("");
@@ -27,6 +27,16 @@ export function DiscoveryManager({ items, providerStatus: initialProviderStatus 
   const [providerResults, setProviderResults] = useState<ProviderSearchItem[]>([]);
   const [providerBusy, setProviderBusy] = useState(false);
   const [savedResultKeys, setSavedResultKeys] = useState<string[]>([]);
+  const [monitors, setMonitors] = useState(initialMonitors);
+  const [fetchRuns, setFetchRuns] = useState(initialFetchRuns);
+  const [monitorOpen, setMonitorOpen] = useState(false);
+  const [providerStatus, setProviderStatus] = useState(initialProviderStatus);
+
+  useEffect(() => {
+    void getProviderStatus().then((result) => {
+      if (result.data) setProviderStatus(result.data);
+    });
+  }, []);
 
   const visible = useMemo(() => list.filter((item) => {
     const tabMatch = tab === "history" || tab === "settings" || item.discovery_type === tab;
@@ -104,6 +114,30 @@ export function DiscoveryManager({ items, providerStatus: initialProviderStatus 
     else flash(getError(result.error));
   }
 
+  async function createMonitor(formData: FormData) {
+    const result = await createDiscoveryMonitor(Object.fromEntries(formData.entries()));
+    if (result.data) { setMonitors((current) => [result.data!, ...current]); setMonitorOpen(false); flash("Monitor added"); }
+    else flash(getError(result.error));
+  }
+
+  async function toggleMonitor(monitor: DiscoveryMonitor) {
+    const result = await updateDiscoveryMonitor(monitor.id, { is_active: !monitor.is_active });
+    if (result.data) setMonitors((current) => current.map((entry) => entry.id === monitor.id ? result.data! : entry));
+    else flash(getError(result.error));
+  }
+
+  async function removeMonitor(id: number) {
+    const result = await deleteDiscoveryMonitor(id);
+    if (result.data) { setMonitors((current) => current.filter((monitor) => monitor.id !== id)); flash("Monitor removed"); }
+    else flash(getError(result.error));
+  }
+
+  async function runFetch(localDaily: boolean) {
+    const result = localDaily ? await runLocalDailyFetch() : await runDiscoveryFetch();
+    if (result.data) { setFetchRuns((current) => [...result.data!, ...current].slice(0, 20)); flash("Local discovery fetch finished"); }
+    else flash(getError(result.error));
+  }
+
   return (
     <div className="space-y-5">
       <GlassCard className="galaxy-surface glow-card p-5 md:p-7">
@@ -121,14 +155,14 @@ export function DiscoveryManager({ items, providerStatus: initialProviderStatus 
         <GlassCard className="p-5">
           <div className="flex items-center justify-between gap-3"><div><p className="text-xs font-semibold uppercase tracking-[0.16em] text-white/42">Provider status</p><h3 className="mt-1 text-lg font-semibold">Connections</h3></div><Link2 size={18} className="text-signal" /></div>
           <div className="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-1">
-            <ProviderRow name="Spotify" configured={initialProviderStatus.spotify.configured} connected={initialProviderStatus.spotify.connected} action={initialProviderStatus.spotify.connected ? undefined : connectSpotify} actionLabel="Connect Spotify" />
-            <ProviderRow name="YouTube" configured={initialProviderStatus.youtube.configured} connected={initialProviderStatus.youtube.configured} />
+            <ProviderRow name="Spotify" configured={providerStatus.spotify.configured} connected={providerStatus.spotify.connected} action={providerStatus.spotify.connected ? undefined : connectSpotify} actionLabel="Connect Spotify" />
+            <ProviderRow name="YouTube" configured={providerStatus.youtube.configured} connected={providerStatus.youtube.configured} />
           </div>
         </GlassCard>
         <GlassCard className="music-sheen p-5">
           <div className="flex items-center gap-2"><Search size={17} className="text-signal" /><div><p className="text-xs font-semibold uppercase tracking-[0.16em] text-white/42">Provider search</p><h3 className="mt-1 text-lg font-semibold">Find new signals</h3></div></div>
           <div className="mt-5 flex flex-col gap-3 md:flex-row">
-            <select value={provider} onChange={(event) => setProvider(event.target.value as ProviderChoice)} className="h-11 rounded-2xl border border-white/10 bg-deck-950/65 px-3 text-sm text-white outline-none"><option value="mock">Mock</option><option value="spotify">Spotify</option><option value="youtube">YouTube</option></select>
+            <select value={provider} onChange={(event) => setProvider(event.target.value as ProviderChoice)} className="h-11 rounded-2xl border border-white/10 bg-deck-950/65 px-3 text-sm text-white outline-none"><option value="mock">Mock</option><option value="spotify" disabled={!providerStatus.spotify.configured}>Spotify</option><option value="youtube" disabled={!providerStatus.youtube.configured}>YouTube</option></select>
             <input value={providerQuery} onChange={(event) => setProviderQuery(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") searchProvider(); }} placeholder={`Search ${provider === "mock" ? "existing signals" : provider}`} className="h-11 min-w-0 flex-1 rounded-2xl border border-white/10 bg-deck-950/65 px-4 text-sm text-white outline-none focus:border-signal/40" />
             <ActionButton variant="primary" onClick={searchProvider} disabled={providerBusy}>{providerBusy ? "Searching" : "Search"}</ActionButton>
           </div>
@@ -138,12 +172,18 @@ export function DiscoveryManager({ items, providerStatus: initialProviderStatus 
 
       {providerResults.length ? <GlassCard className="p-5"><div className="flex items-center justify-between gap-3"><div><p className="text-xs font-semibold uppercase tracking-[0.16em] text-white/42">Search results</p><h3 className="mt-1 text-lg font-semibold">{provider} results</h3></div><Badge tone="signal">{providerResults.length} found</Badge></div><div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-3">{providerResults.map((item) => <ProviderResultCard key={resultKey(item)} item={item} saved={savedResultKeys.includes(resultKey(item))} onSave={() => saveSearchResult(item)} />)}</div></GlassCard> : null}
 
+      <div className="grid gap-4 xl:grid-cols-[1.3fr_1fr]">
+        <GlassCard className="p-5"><div className="flex flex-wrap items-center justify-between gap-3"><div><p className="text-xs font-semibold uppercase tracking-[0.16em] text-white/42">Local monitoring</p><h3 className="mt-1 text-lg font-semibold">Discovery monitors</h3></div><div className="flex flex-wrap gap-2"><ActionButton onClick={() => runFetch(false)}><RefreshCw size={15} /> Run monitors</ActionButton><ActionButton variant="primary" onClick={() => runFetch(true)}><Radio size={15} /> Run Local Daily Fetch</ActionButton><ActionButton onClick={() => setMonitorOpen(true)}><Plus size={15} /> Add monitor</ActionButton></div></div><div className="mt-4 space-y-2">{monitors.length ? monitors.map((monitor) => <div key={monitor.id} className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-white/10 bg-white/[0.035] p-3"><div><p className="font-medium text-white">{monitor.name}</p><p className="mt-1 text-xs text-white/48">{monitor.provider} · {monitor.monitor_type} · {monitor.query || monitor.artist_name || monitor.genre || "default signal"}</p></div><div className="flex items-center gap-2"><Badge tone={monitor.is_active ? "signal" : "neutral"}>{monitor.is_active ? "Active" : "Paused"}</Badge><ActionButton onClick={() => toggleMonitor(monitor)}>{monitor.is_active ? "Pause" : "Resume"}</ActionButton><ActionButton variant="danger" onClick={() => removeMonitor(monitor.id)}><Trash2 size={14} /></ActionButton></div></div>) : <p className="rounded-2xl border border-dashed border-white/12 p-4 text-sm text-white/50">Add a local query, genre, artist, trending, or latest monitor to automate discovery.</p>}</div></GlassCard>
+        <GlassCard className="p-5"><p className="text-xs font-semibold uppercase tracking-[0.16em] text-white/42">Fetch history</p><h3 className="mt-1 text-lg font-semibold">Recent local runs</h3><div className="mt-4 space-y-2">{fetchRuns.length ? fetchRuns.slice(0, 6).map((run) => <div key={run.id} className="rounded-2xl border border-white/10 bg-white/[0.035] p-3"><div className="flex items-center justify-between gap-2"><span className="font-medium text-white">{run.provider}</span><Badge tone={run.status === "success" ? "signal" : run.status === "skipped" ? "amber" : "cue"}>{run.status}</Badge></div><p className="mt-1 text-xs text-white/48">{run.items_found} found · {run.items_saved} saved · {run.run_type}</p>{run.error_message ? <p className="mt-2 text-xs leading-5 text-cue">{run.error_message}</p> : null}</div>) : <p className="rounded-2xl border border-dashed border-white/12 p-4 text-sm text-white/50">No local fetch runs yet.</p>}</div></GlassCard>
+      </div>
+
       <GlassCard className="music-sheen p-4"><div className="flex flex-col gap-3 xl:flex-row xl:items-center"><SearchInput value={search} onChange={setSearch} placeholder="Search discovery history" /><div className="flex flex-wrap gap-2"><ActionButton variant="primary" onClick={() => setOpen(true)}><Plus size={16} /> Manual Item</ActionButton><ActionButton onClick={runMockFetch}><RefreshCw size={16} /> Mock Daily Fetch</ActionButton></div></div><div className="mt-4 flex flex-wrap gap-2">{tabs.map((item) => <button key={item} onClick={() => setTab(item)} className={`rounded-full border px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.08em] transition ${tab === item ? "border-signal/30 bg-signal/12 text-signal" : "border-white/10 bg-white/7 text-white/52 hover:text-white"}`}>{item.replaceAll("_", " ")}</button>)}</div></GlassCard>
 
       {tab === "settings" ? <GlassCard className="p-5 text-sm leading-6 text-white/65">Real Spotify and YouTube daily fetch scheduling is planned for Phase 6B. The current mock daily fetch remains available and provider secrets stay server-side.</GlassCard> : null}
 
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">{visible.map((item) => <GlassCard key={item.id} className="glow-card music-sheen p-5"><div className="flex items-start justify-between gap-3"><Radio className="text-signal" /><Badge>{item.platform}</Badge></div><h3 className="mt-4 text-lg font-semibold text-white">{item.title}</h3><p className="mt-2 text-sm text-white/58">{item.artist_name ?? "Unknown artist"}</p><div className="mt-4 flex flex-wrap gap-2"><Badge>{item.discovery_type}</Badge>{item.is_saved ? <Badge tone="signal">Saved</Badge> : null}{item.is_rejected ? <Badge tone="cue">Rejected</Badge> : null}</div><div className="mt-5 flex flex-wrap gap-2"><ActionButton disabled={item.is_saved} onClick={() => saveItem(item)}><Save size={15} /> Save to Library</ActionButton>{item.source_url ? <ActionButton onClick={() => window.open(item.source_url!, "_blank", "noopener,noreferrer")}><ExternalLink size={15} /> Source</ActionButton> : null}{item.is_rejected ? <ActionButton onClick={() => restore(item)}><Undo2 size={15} /> Restore</ActionButton> : <ActionButton variant="danger" onClick={() => reject(item)}><Trash2 size={15} /> Reject</ActionButton>}</div></GlassCard>)}</div>
       <Modal open={open} title="Create Discovery Item" onClose={() => setOpen(false)}><form action={save} className="grid gap-4"><Field name="title" label="Title" /><Field name="artist_name" label="Artist" /><Field name="platform" label="Platform" defaultValue="manual" /><Field name="source_url" label="Source URL" /><Field name="discovery_type" label="Discovery type" defaultValue="manual_search" /><Field name="popularity_score" label="Popularity" type="number" /><div className="flex justify-end"><ActionButton type="submit" variant="primary">Save</ActionButton></div></form></Modal>
+      <Modal open={monitorOpen} title="Add Local Discovery Monitor" onClose={() => setMonitorOpen(false)}><form action={createMonitor} className="grid gap-4"><Field name="name" label="Monitor name" placeholder="Afro house pulse" required /><SelectField name="provider" label="Provider" values={["mock", "spotify", "youtube"]} /><SelectField name="monitor_type" label="Monitor type" values={["query", "genre", "artist", "trending", "latest"]} /><Field name="query" label="Query" placeholder="Afro house 2026" /><Field name="genre" label="Genre" placeholder="Afro House" /><Field name="artist_name" label="Artist" placeholder="Artist name" /><div className="flex justify-end"><ActionButton type="submit" variant="primary">Add monitor</ActionButton></div></form></Modal>
       <Toast message={toast} />
     </div>
   );
@@ -160,3 +200,4 @@ function ProviderResultCard({ item, saved, onSave }: { item: ProviderSearchItem;
 function toProviderItem(item: DiscoveryItem): ProviderSearchItem { return { title: item.title, artist_name: item.artist_name, platform: item.platform, source_url: item.source_url, thumbnail_url: item.thumbnail_url, discovery_type: item.discovery_type, popularity_score: item.popularity_score, metadata_json: item.metadata_json }; }
 function resultKey(item: ProviderSearchItem): string { return `${item.platform}:${item.source_url ?? item.title}:${item.artist_name ?? ""}`; }
 function Field(props: React.InputHTMLAttributes<HTMLInputElement> & { label: string }) { const { label, ...rest } = props; return <label className="space-y-2 text-sm text-white/62"><span>{label}</span><input {...rest} className="h-11 w-full rounded-2xl border border-white/10 bg-white/8 px-3 text-white outline-none" /></label>; }
+function SelectField({ name, label, values }: { name: string; label: string; values: string[] }) { return <label className="space-y-2 text-sm text-white/62"><span>{label}</span><select name={name} className="h-11 w-full rounded-2xl border border-white/10 bg-deck-950 px-3 text-white outline-none">{values.map((value) => <option key={value} value={value}>{value}</option>)}</select></label>; }

@@ -4,6 +4,7 @@ __pycache__/
 .venv/
 venv/
 *.db
+backend/media/audio/
 
 # Node
 node_modules/

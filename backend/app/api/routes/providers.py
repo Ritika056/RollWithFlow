@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import HTMLResponse
 from sqlalchemy.orm import Session
 
-from app.api.dependencies import get_current_active_user
+from app.api.dependencies import bearer_scheme, get_current_active_user
 from app.core.database import get_db
 from app.models import User
 from app.schemas.common import (
@@ -14,15 +14,20 @@ from app.schemas.common import (
     YouTubeProviderStatus,
 )
 from app.services import spotify_client, youtube_client
+from app.services.auth_service import get_user_from_token
 
 
 router = APIRouter(prefix="/api/providers", tags=["providers"])
 
 
 @router.get("/status", response_model=ProviderStatusRead)
-def provider_status(current_user: User = Depends(get_current_active_user), db: Session = Depends(get_db)) -> ProviderStatusRead:
+def provider_status(
+    credentials=Depends(bearer_scheme),
+    db: Session = Depends(get_db),
+) -> ProviderStatusRead:
+    current_user = get_user_from_token(db, credentials.credentials) if credentials else None
     return ProviderStatusRead(
-        spotify=SpotifyProviderStatus(configured=spotify_client.is_configured(), connected=spotify_client.is_connected(db, current_user.id)),
+        spotify=SpotifyProviderStatus(configured=spotify_client.is_configured(), connected=spotify_client.is_connected(db, current_user.id) if current_user else False),
         youtube=YouTubeProviderStatus(configured=youtube_client.is_configured()),
     )
 

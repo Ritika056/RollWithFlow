@@ -2,8 +2,9 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
-from app.models import Song
-from app.schemas.common import SongRead, SongUpdate, SongWrite
+from app.models import Song, SourceType
+from app.schemas.common import RepairLocalPathRequest, RescanMetadataRequest, SongRead, SongUpdate, SongWrite
+from app.services.library_scan_service import apply_local_metadata, repair_local_path, resolve_local_file
 from app.services.song_service import apply_song_payload, filter_songs, song_with_relations_query
 
 router = APIRouter(prefix="/api", tags=["songs"])
@@ -69,6 +70,32 @@ def create_song(payload: SongWrite, db: Session = Depends(get_db)) -> Song:
 def update_song(song_id: int, payload: SongUpdate, db: Session = Depends(get_db)) -> Song:
     song = get_song_or_404(db, song_id)
     apply_song_payload(db, song, payload)
+    db.commit()
+    return get_song(song.id, db)
+
+
+@router.post("/songs/{song_id}/repair-local-path", response_model=SongRead)
+def repair_song_local_path(song_id: int, payload: RepairLocalPathRequest, db: Session = Depends(get_db)) -> Song:
+    song = get_song_or_404(db, song_id)
+    try:
+        repair_local_path(db, song, payload.new_file_path.strip())
+        db.commit()
+    except ValueError as error:
+        db.rollback()
+        raise HTTPException(status_code=400, detail=str(error)) from error
+    return get_song(song.id, db)
+
+
+@router.post("/songs/{song_id}/rescan-metadata", response_model=SongRead)
+def rescan_song_metadata(song_id: int, payload: RescanMetadataRequest, db: Session = Depends(get_db)) -> Song:
+    song = get_song_or_404(db, song_id)
+    source = next((item for item in song.sources if item.type == SourceType.local), None)
+    if not source:
+        raise HTTPException(status_code=400, detail="This song has no local file to rescan")
+    path, error = resolve_local_file(source)
+    if error or path is None:
+        raise HTTPException(status_code=400, detail=error or "Local file is unavailable")
+    apply_local_metadata(db, song, path, overwrite=payload.overwrite)
     db.commit()
     return get_song(song.id, db)
 

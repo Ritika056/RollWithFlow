@@ -1,9 +1,10 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { Plus, SlidersHorizontal } from "lucide-react";
+import { FileAudio, FolderUp, Plus, SlidersHorizontal } from "lucide-react";
 
 import { AddToFolderModal } from "@/components/songs/AddToFolderModal";
+import { AudioImportModal } from "@/components/songs/AudioImportModal";
 import { SongFormModal } from "@/components/songs/SongFormModal";
 import { SongTable } from "@/components/songs/SongTable";
 import { ActionButton } from "@/components/ui/ActionButton";
@@ -17,10 +18,11 @@ import {
   createSong,
   likeSong,
   rejectSong,
+  rescanSongMetadata,
   unlikeSong,
   updateSong,
 } from "@/lib/api";
-import type { Folder, Song, SongPayload, SourceType } from "@/types/api";
+import type { AudioUploadResult, Folder, Song, SongPayload, SourceType } from "@/types/api";
 
 export function LibraryManager({
   initialSongs,
@@ -38,6 +40,8 @@ export function LibraryManager({
   const [filter, setFilter] = useState("all");
   const [editing, setEditing] = useState<Song | null>(null);
   const [songFormOpen, setSongFormOpen] = useState(false);
+  const [audioImportOpen, setAudioImportOpen] = useState(false);
+  const [audioImportMode, setAudioImportMode] = useState<"files" | "folder">("files");
   const [folderSong, setFolderSong] = useState<Song | null>(null);
   const [toast, setToast] = useState<string | null>(null);
   const [toastTone, setToastTone] = useState<"success" | "error">("success");
@@ -89,6 +93,13 @@ export function LibraryManager({
     showToast("Song rejected");
   }
 
+  async function handleRescanMetadata(song: Song) {
+    const result = await rescanSongMetadata(song.id);
+    if (!result.data) return showToast(result.error ?? "Metadata rescan failed", "error");
+    setSongs((current) => current.map((item) => item.id === song.id ? result.data! : item));
+    showToast("Local metadata refreshed");
+  }
+
   async function handleAddToFolder(folderId: number) {
     if (!folderSong) return;
     const result = await addSongToFolder(folderId, folderSong.id);
@@ -105,6 +116,18 @@ export function LibraryManager({
     if (!result.data) return showToast(result.error ?? "Folder create failed", "error");
     setFolders((current) => [result.data!, ...current]);
     showToast("Folder created");
+  }
+
+  function handleImported(result: AudioUploadResult) {
+    setSongs((current) => [...result.created_songs, ...current]);
+    setAudioImportOpen(false);
+    const suffix = result.errors.length ? ` ${result.errors.length} file(s) need attention.` : "";
+    showToast(`${result.created_count} song${result.created_count === 1 ? "" : "s"} imported.${suffix}`, result.errors.length ? "error" : "success");
+  }
+
+  function openAudioImport(mode: "files" | "folder") {
+    setAudioImportMode(mode);
+    setAudioImportOpen(true);
   }
 
   return (
@@ -127,23 +150,20 @@ export function LibraryManager({
               <option value="missing_key">Missing key</option>
               <option value="missing_genre">Missing genre</option>
             </select>
-            {mode === "library" ? (
-              <ActionButton variant="primary" onClick={() => { setEditing(null); setSongFormOpen(true); }}>
-                <Plus size={17} /> New Song
-              </ActionButton>
-            ) : null}
+            {mode === "library" ? <><ActionButton variant="primary" onClick={() => openAudioImport("files")}><FileAudio size={17} /> Upload Audio</ActionButton><ActionButton onClick={() => openAudioImport("folder")}><FolderUp size={17} /> Import Folder</ActionButton><ActionButton variant="ghost" onClick={() => { setEditing(null); setSongFormOpen(true); }}><Plus size={17} /> Manual entry</ActionButton></> : null}
           </div>
         </div>
         <p className="mt-3 flex items-center gap-2 text-xs text-white/42"><SlidersHorizontal size={14} /> Showing {filteredSongs.length} of {songs.length} songs</p>
       </GlassCard>
 
       {filteredSongs.length ? (
-        <SongTable songs={filteredSongs} onLikeToggle={handleLikeToggle} onEdit={(song) => { setEditing(song); setSongFormOpen(true); }} onAddToFolder={setFolderSong} onReject={handleReject} />
+        <SongTable songs={filteredSongs} onLikeToggle={handleLikeToggle} onEdit={(song) => { setEditing(song); setSongFormOpen(true); }} onAddToFolder={setFolderSong} onReject={handleReject} onRescanMetadata={mode === "library" ? handleRescanMetadata : undefined} />
       ) : (
         <EmptyState title="No songs match this view" description="Try clearing filters or create a manual song to start building the library." />
       )}
 
       <SongFormModal open={songFormOpen} song={editing} onClose={() => { setSongFormOpen(false); setEditing(null); }} onSubmit={handleSave} />
+      <AudioImportModal open={audioImportOpen} initialMode={audioImportMode} onClose={() => setAudioImportOpen(false)} onImported={handleImported} onManualEntry={() => { setAudioImportOpen(false); setEditing(null); setSongFormOpen(true); }} />
       <AddToFolderModal open={Boolean(folderSong)} song={folderSong} folders={folders} onClose={() => setFolderSong(null)} onAdd={handleAddToFolder} onCreateFolder={handleCreateFolder} />
       <Toast message={toast} tone={toastTone} />
     </div>
