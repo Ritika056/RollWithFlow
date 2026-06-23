@@ -1,6 +1,7 @@
 import { CollectionManager } from "@/components/collections/CollectionManagers";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { getCrates } from "@/lib/server-api";
+export const dynamic = "force-dynamic";
 
 export default async function CratesPage() {
   const { data } = await getCrates();

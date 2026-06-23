@@ -16,11 +16,14 @@ import type {
   LoginResponse,
   ProviderSearchResponse,
   ProviderStatus,
+  ProviderDiagnostics,
   DiscoveryFetchRun,
   DiscoveryMonitor,
+  EventItem, EventTimelineItem, EventChecklistItem, EventMusicLink, AnalyticsSummary,
+  MixSong,
 } from "@/types/api";
 
-export const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://127.0.0.1:8000";
+export const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://127.0.0.1:8001";
 
 export type ApiResult<T> = {
   data: T | null;
@@ -42,11 +45,15 @@ async function request<T>(path: string, init?: RequestInit): Promise<ApiResult<T
     });
     if (!response.ok) {
       const text = await response.text();
+      if (response.status === 401 && path !== "/api/auth/login" && typeof window !== "undefined") {
+        document.cookie = "rwf_token=; Path=/; Max-Age=0; SameSite=Lax";
+        window.location.assign("/login?reauth=1");
+      }
       return { data: null, error: text || `Backend returned ${response.status}` };
     }
     return { data: (await response.json()) as T, error: null };
   } catch {
-    return { data: null, error: "Backend is not reachable. Start FastAPI on port 8000 and try again." };
+    return { data: null, error: "Backend is not reachable. Start FastAPI on port 8001 and try again." };
   }
 }
 
@@ -121,6 +128,10 @@ export const getMix = (id: number) => apiGet<Mix>(`/api/mixes/${id}`);
 export const createMix = (payload: Partial<Mix> & { genre_name?: string }) => apiPost<Mix>("/api/mixes", payload);
 export const updateMix = (id: number, payload: Partial<Mix> & { genre_name?: string }) => apiPatch<Mix>(`/api/mixes/${id}`, payload);
 export const deleteMix = (id: number) => apiDelete<{ status: string }>(`/api/mixes/${id}`);
+export const getMixSongs = (id: number) => apiGet<MixSong[]>(`/api/mixes/${id}/songs`);
+export const addMixSong = (mixId: number, payload: { song_id: number; position?: number; cue_notes?: string; transition_notes?: string }) => apiPost<MixSong>(`/api/mixes/${mixId}/songs`, payload);
+export const updateMixSong = (mixId: number, linkId: number, payload: Partial<MixSong>) => apiPatch<MixSong>(`/api/mixes/${mixId}/songs/${linkId}`, payload);
+export const deleteMixSong = (mixId: number, linkId: number) => apiDelete<{ status: string }>(`/api/mixes/${mixId}/songs/${linkId}`);
 export const getDiscovery = () => apiGet<DiscoveryItem[]>("/api/discovery");
 export const createDiscovery = (payload: Partial<DiscoveryItem>) => apiPost<DiscoveryItem>("/api/discovery", payload);
 export const saveDiscoveryToLibrary = (id: number) => apiPost<Song>(`/api/discovery/${id}/save-to-library`);
@@ -128,11 +139,31 @@ export const rejectDiscovery = (id: number) => apiPost<{ status: string }>(`/api
 export const restoreDiscovery = (id: number) => apiPost<DiscoveryItem>(`/api/discovery/${id}/restore`);
 export const mockDailyFetch = () => apiPost<DiscoveryItem[]>("/api/discovery/mock-daily-fetch");
 export const getProviderStatus = () => apiGet<ProviderStatus>("/api/providers/status");
+export const getProviderDiagnostics = () => apiGet<ProviderDiagnostics>("/api/providers/diagnostics");
 export const getSpotifyConnectUrl = () => apiGet<{ authorization_url: string }>("/api/providers/spotify/connect");
-export const searchSpotify = (query: string) => apiPost<ProviderSearchResponse>("/api/providers/spotify/search", { query });
-export const searchYouTube = (query: string) => apiPost<ProviderSearchResponse>("/api/providers/youtube/search", { query });
+export const disconnectSpotify = () => apiPost<{ status: string }>("/api/providers/spotify/disconnect");
+export const searchSpotify = (query: string, limit = 50) => apiPost<ProviderSearchResponse>("/api/providers/spotify/search", { query, limit });
+export const searchYouTube = (query: string, limit = 50) => apiPost<ProviderSearchResponse>("/api/providers/youtube/search", { query, limit });
 export const createDiscoveryMonitor = (payload: Partial<DiscoveryMonitor>) => apiPost<DiscoveryMonitor>("/api/discovery/monitors", payload);
 export const updateDiscoveryMonitor = (id: number, payload: Partial<DiscoveryMonitor>) => apiPatch<DiscoveryMonitor>(`/api/discovery/monitors/${id}`, payload);
 export const deleteDiscoveryMonitor = (id: number) => apiDelete<{ status: string }>(`/api/discovery/monitors/${id}`);
 export const runDiscoveryFetch = (provider?: string) => apiPost<DiscoveryFetchRun[]>("/api/discovery/run-fetch", provider ? { provider } : {});
 export const runLocalDailyFetch = () => apiPost<DiscoveryFetchRun[]>("/api/discovery/run-local-daily-fetch");
+export const getEvents = () => apiGet<EventItem[]>("/api/events");
+export const getEvent = (id: number) => apiGet<EventItem>(`/api/events/${id}`);
+export const createEvent = (payload: Partial<EventItem>) => apiPost<EventItem>("/api/events", payload);
+export const updateEvent = (id: number, payload: Partial<EventItem>) => apiPatch<EventItem>(`/api/events/${id}`, payload);
+export const deleteEvent = (id: number) => apiDelete<{ status: string }>(`/api/events/${id}`);
+export const getEventTimeline = (id: number) => apiGet<EventTimelineItem[]>(`/api/events/${id}/timeline`);
+export const createEventTimeline = (id: number, payload: Partial<EventTimelineItem>) => apiPost<EventTimelineItem>(`/api/events/${id}/timeline`, payload);
+export const updateEventTimeline = (id: number, itemId: number, payload: Partial<EventTimelineItem>) => apiPatch<EventTimelineItem>(`/api/events/${id}/timeline/${itemId}`, payload);
+export const deleteEventTimeline = (id: number, itemId: number) => apiDelete<{ status: string }>(`/api/events/${id}/timeline/${itemId}`);
+export const getEventChecklist = (id: number) => apiGet<EventChecklistItem[]>(`/api/events/${id}/checklist`);
+export const createEventChecklist = (id: number, payload: Partial<EventChecklistItem>) => apiPost<EventChecklistItem>(`/api/events/${id}/checklist`, payload);
+export const updateEventChecklist = (id: number, itemId: number, payload: Partial<EventChecklistItem>) => apiPatch<EventChecklistItem>(`/api/events/${id}/checklist/${itemId}`, payload);
+export const deleteEventChecklist = (id: number, itemId: number) => apiDelete<{ status: string }>(`/api/events/${id}/checklist/${itemId}`);
+export const getEventMusicLinks = (id: number) => apiGet<EventMusicLink[]>(`/api/events/${id}/music-links`);
+export const createEventMusicLink = (id: number, payload: Partial<EventMusicLink>) => apiPost<EventMusicLink>(`/api/events/${id}/music-links`, payload);
+export const deleteEventMusicLink = (id: number, linkId: number) => apiDelete<{ status: string }>(`/api/events/${id}/music-links/${linkId}`);
+export const getAnalytics = () => apiGet<AnalyticsSummary>("/api/analytics/summary");
+export const analyzeAudioBasic = (id: number) => apiPost<Song>(`/api/songs/${id}/analyze-audio-basic`);

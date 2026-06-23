@@ -2,7 +2,7 @@ from fastapi import Depends, FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.dependencies import get_current_active_user
-from app.api.routes import audio, auth, collections, crates, dashboard, discovery, folders, health, library, mixes, playlists, providers, songs
+from app.api.routes import ai, analytics, audio, auth, collections, crates, dashboard, discovery, events, exports, folders, health, imports, library, mixes, playlists, providers, songs
 from app.core.config import get_settings
 from app.core.database import SessionLocal, init_db
 from app.services.auth_service import create_admin_from_settings
@@ -50,3 +50,8 @@ app.include_router(discovery.router, dependencies=protected)
 app.include_router(collections.router, dependencies=protected)
 app.include_router(providers.router)
 app.include_router(audio.router, dependencies=protected)
+app.include_router(events.router, dependencies=protected)
+app.include_router(exports.router, dependencies=protected)
+app.include_router(analytics.router, dependencies=protected)
+app.include_router(ai.router, dependencies=protected)
+app.include_router(imports.router, dependencies=protected)

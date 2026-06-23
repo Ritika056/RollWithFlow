@@ -43,6 +43,13 @@ def init_db() -> None:
                     conn.execute(text(f"ALTER TABLE {table} ADD COLUMN {ddl}"))
 
             add_column_if_missing("songs", "compatibility_note", "compatibility_note TEXT")
+            add_column_if_missing("songs", "detected_bpm", "detected_bpm REAL")
+            add_column_if_missing("songs", "detected_key", "detected_key TEXT")
+            add_column_if_missing("songs", "cue_points_json", "cue_points_json JSON")
+            add_column_if_missing("songs", "loop_points_json", "loop_points_json JSON")
+            add_column_if_missing("songs", "waveform_status", "waveform_status TEXT")
+            add_column_if_missing("songs", "analysis_status", "analysis_status TEXT")
+            add_column_if_missing("songs", "analysis_error", "analysis_error TEXT")
             add_column_if_missing("playlist_songs", "cue_note", "cue_note TEXT")
             add_column_if_missing("playlist_songs", "transition_note", "transition_note TEXT")
             add_column_if_missing("playlist_songs", "must_play", "must_play BOOLEAN NOT NULL DEFAULT 0")

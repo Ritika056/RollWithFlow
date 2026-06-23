@@ -8,6 +8,7 @@ import { EmptyState } from "@/components/ui/EmptyState";
 import { GlassCard } from "@/components/ui/GlassCard";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { getDashboardSummary } from "@/lib/server-api";
+export const dynamic = "force-dynamic";
 
 const fallbackSummary = {
   total_songs: 0,

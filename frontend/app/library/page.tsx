@@ -1,6 +1,7 @@
 import { LibraryManager } from "@/components/songs/LibraryManager";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { getFolders, getSongs } from "@/lib/server-api";
+export const dynamic = "force-dynamic";
 
 export default async function LibraryPage() {
   const [{ data: songs, error: songsError }, { data: folders }] = await Promise.all([getSongs(), getFolders()]);

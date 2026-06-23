@@ -1,5 +1,6 @@
 import { FoldersManager } from "@/components/folders/FoldersManager";
 import { getFolders } from "@/lib/server-api";
+export const dynamic = "force-dynamic";
 
 export default async function FoldersPage() {
   const { data: folders, error } = await getFolders();

@@ -7,6 +7,7 @@ import {
   Bot,
   CalendarDays,
   Compass,
+  BarChart3,
   Folder,
   Heart,
   LayoutDashboard,
@@ -27,6 +28,7 @@ const navItems = [
   { href: "/liked-songs", label: "Liked Tracks", icon: Heart },
   { href: "/mixes", label: "Mixes", icon: Music2 },
   { href: "/discovery", label: "Discovery", icon: Compass },
+  { href: "/analytics", label: "Analytics", icon: BarChart3 },
   { href: "/ai-copilot", label: "AI Copilot", icon: Bot },
   { href: "/settings", label: "Settings", icon: Settings },
 ];

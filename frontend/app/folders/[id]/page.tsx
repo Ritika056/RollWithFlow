@@ -5,6 +5,7 @@ import { FolderDetailManager } from "@/components/folders/FolderDetailManager";
 import { Badge } from "@/components/ui/Badge";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { getFolder, getFolders, getFolderSongs } from "@/lib/server-api";
+export const dynamic = "force-dynamic";
 
 export default async function FolderDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;

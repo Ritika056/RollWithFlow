@@ -45,6 +45,11 @@ class SongRead(ORMBase):
     rating: int | None = None
     notes: str | None = None
     compatibility_note: str | None = None
+    detected_bpm: float | None = None
+    detected_key: str | None = None
+    waveform_status: str | None = None
+    analysis_status: str | None = None
+    analysis_error: str | None = None
     is_liked: bool
     is_rejected: bool
     is_active: bool
@@ -144,6 +149,119 @@ class RescanMetadataRequest(BaseModel):
     overwrite: bool = False
 
 
+class EventWrite(BaseModel):
+    name: str
+    event_type: str | None = None
+    event_date: datetime | None = None
+    venue: str | None = None
+    client_name: str | None = None
+    expected_guests: int | None = None
+    mood: str | None = None
+    notes: str | None = None
+
+
+class EventTimelineWrite(BaseModel):
+    title: str
+    start_time: str | None = None
+    end_time: str | None = None
+    sort_order: int = 0
+    notes: str | None = None
+    playlist_id: int | None = None
+    crate_id: int | None = None
+
+
+class EventChecklistWrite(BaseModel):
+    title: str
+    category: str | None = None
+    is_done: bool = False
+    sort_order: int = 0
+    notes: str | None = None
+
+
+class EventMusicLinkWrite(BaseModel):
+    playlist_id: int | None = None
+    crate_id: int | None = None
+    mix_id: int | None = None
+    notes: str | None = None
+
+
+class EventTimelineRead(ORMBase):
+    id: int
+    event_id: int
+    title: str
+    start_time: str | None = None
+    end_time: str | None = None
+    sort_order: int
+    notes: str | None = None
+    playlist_id: int | None = None
+    crate_id: int | None = None
+
+
+class EventChecklistRead(ORMBase):
+    id: int
+    event_id: int
+    title: str
+    category: str | None = None
+    is_done: bool
+    sort_order: int
+    notes: str | None = None
+
+
+class EventMusicLinkRead(ORMBase):
+    id: int
+    event_id: int
+    playlist_id: int | None = None
+    crate_id: int | None = None
+    mix_id: int | None = None
+    notes: str | None = None
+
+
+class EventRead(ORMBase):
+    id: int
+    name: str
+    event_type: str | None = None
+    event_date: datetime | None = None
+    venue: str | None = None
+    client_name: str | None = None
+    expected_guests: int | None = None
+    mood: str | None = None
+    notes: str | None = None
+    readiness_percent: int
+    created_at: datetime
+    updated_at: datetime
+
+
+class AnalyticsSummary(BaseModel):
+    total_songs: int
+    playable_local_songs: int
+    provider_only_songs: int
+    liked_songs: int
+    rejected_songs: int
+    missing_bpm: int
+    missing_key: int
+    missing_genre: int
+    missing_artwork: int
+    top_genres: list[dict[str, Any]]
+    top_artists: list[dict[str, Any]]
+    source_breakdown: list[dict[str, Any]]
+    energy_distribution: list[dict[str, Any]]
+    rating_distribution: list[dict[str, Any]]
+    most_used_folders: list[dict[str, Any]]
+    most_used_crates: list[dict[str, Any]]
+    playlist_count: int
+    event_count: int
+
+
+class BackupValidationReport(BaseModel):
+    valid: bool
+    errors: list[str] = []
+    counts: dict[str, int] = {}
+    would_create: dict[str, int] = {}
+    would_update: dict[str, int] = {}
+    would_skip: dict[str, int] = {}
+    notes: list[str] = []
+
+
 class FolderWrite(BaseModel):
     name: str
     description: str | None = None
@@ -229,6 +347,29 @@ class MixWrite(BaseModel):
     tracklist_text: str | None = None
 
 
+class MixSongWrite(BaseModel):
+    song_id: int
+    position: int | None = None
+    cue_notes: str | None = None
+    transition_notes: str | None = None
+
+
+class MixSongUpdate(BaseModel):
+    position: int | None = None
+    cue_notes: str | None = None
+    transition_notes: str | None = None
+
+
+class MixSongRead(ORMBase):
+    id: int
+    mix_id: int
+    song_id: int
+    position: int
+    cue_notes: str | None = None
+    transition_notes: str | None = None
+    song: SongRead
+
+
 class DiscoveryItemRead(ORMBase):
     id: int
     title: str
@@ -271,9 +412,15 @@ class ProviderStatusRead(BaseModel):
     youtube: YouTubeProviderStatus
 
 
+class ProviderDiagnosticsRead(BaseModel):
+    spotify: SpotifyProviderStatus
+    youtube: YouTubeProviderStatus
+    spotify_redirect_uri: str | None = None
+
+
 class ProviderSearchRequest(BaseModel):
     query: str = Field(min_length=1, max_length=200)
-    limit: int = Field(default=10, ge=1, le=25)
+    limit: int = Field(default=50, ge=1, le=100)
 
 
 class ProviderSearchItem(BaseModel):
@@ -290,10 +437,17 @@ class ProviderSearchItem(BaseModel):
 class ProviderSearchResponse(BaseModel):
     provider: str
     results: list[ProviderSearchItem]
+    requested_count: int = 50
+    returned_count: int = 0
 
 
 class SpotifyConnectResponse(BaseModel):
     authorization_url: str
+
+
+class SpotifyPlaybackCredentials(BaseModel):
+    client_id: str
+    access_token: str
 
 
 class DiscoveryMonitorWrite(BaseModel):

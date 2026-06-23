@@ -1,12 +1,14 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { FileAudio, FolderUp, Plus, SlidersHorizontal } from "lucide-react";
 
 import { AddToFolderModal } from "@/components/songs/AddToFolderModal";
 import { AudioImportModal } from "@/components/songs/AudioImportModal";
 import { SongFormModal } from "@/components/songs/SongFormModal";
 import { SongTable } from "@/components/songs/SongTable";
+import { PlayAllButton } from "@/components/player/PlayAllButton";
 import { ActionButton } from "@/components/ui/ActionButton";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { GlassCard } from "@/components/ui/GlassCard";
@@ -33,9 +35,10 @@ export function LibraryManager({
   initialFolders: Folder[];
   mode?: "library" | "liked" | "folder";
 }) {
+  const searchParams = useSearchParams();
   const [songs, setSongs] = useState(initialSongs);
   const [folders, setFolders] = useState(initialFolders);
-  const [search, setSearch] = useState("");
+  const [search, setSearch] = useState(() => searchParams.get("search") ?? "");
   const [source, setSource] = useState<SourceType | "all">("all");
   const [filter, setFilter] = useState("all");
   const [editing, setEditing] = useState<Song | null>(null);
@@ -153,7 +156,7 @@ export function LibraryManager({
             {mode === "library" ? <><ActionButton variant="primary" onClick={() => openAudioImport("files")}><FileAudio size={17} /> Upload Audio</ActionButton><ActionButton onClick={() => openAudioImport("folder")}><FolderUp size={17} /> Import Folder</ActionButton><ActionButton variant="ghost" onClick={() => { setEditing(null); setSongFormOpen(true); }}><Plus size={17} /> Manual entry</ActionButton></> : null}
           </div>
         </div>
-        <p className="mt-3 flex items-center gap-2 text-xs text-white/42"><SlidersHorizontal size={14} /> Showing {filteredSongs.length} of {songs.length} songs</p>
+        <div className="mt-3 flex items-center justify-between gap-3"><p className="flex items-center gap-2 text-xs text-white/42"><SlidersHorizontal size={14} /> Showing {filteredSongs.length} of {songs.length} songs</p><PlayAllButton songs={filteredSongs} onResult={showToast} /></div>
       </GlassCard>
 
       {filteredSongs.length ? (

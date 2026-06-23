@@ -144,6 +144,13 @@ class Song(TimestampMixin, Base):
     rating: Mapped[int | None] = mapped_column(Integer, nullable=True)
     notes: Mapped[str | None] = mapped_column(Text, nullable=True)
     compatibility_note: Mapped[str | None] = mapped_column(Text, nullable=True)
+    detected_bpm: Mapped[float | None] = mapped_column(Float, nullable=True)
+    detected_key: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    cue_points_json: Mapped[list[dict[str, Any]] | None] = mapped_column(JSON, nullable=True)
+    loop_points_json: Mapped[list[dict[str, Any]] | None] = mapped_column(JSON, nullable=True)
+    waveform_status: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    analysis_status: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    analysis_error: Mapped[str | None] = mapped_column(Text, nullable=True)
     is_liked: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     is_rejected: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
@@ -173,6 +180,74 @@ class Mix(TimestampMixin, Base):
     tracklist_text: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     genre: Mapped[Genre | None] = relationship(back_populates="mixes")
+    song_links: Mapped[list["MixSong"]] = relationship(back_populates="mix", cascade="all, delete-orphan", order_by="MixSong.position")
+
+
+class MixSong(TimestampMixin, Base):
+    __tablename__ = "mix_songs"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    mix_id: Mapped[int] = mapped_column(ForeignKey("mixes.id", ondelete="CASCADE"), index=True)
+    song_id: Mapped[int] = mapped_column(ForeignKey("songs.id", ondelete="CASCADE"), index=True)
+    position: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    cue_notes: Mapped[str | None] = mapped_column(Text, nullable=True)
+    transition_notes: Mapped[str | None] = mapped_column(Text, nullable=True)
+    mix: Mapped[Mix] = relationship(back_populates="song_links")
+    song: Mapped[Song] = relationship()
+
+
+class Event(TimestampMixin, Base):
+    __tablename__ = "events"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    name: Mapped[str] = mapped_column(String(255), index=True, nullable=False)
+    event_type: Mapped[str | None] = mapped_column(String(120), nullable=True)
+    event_date: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    venue: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    client_name: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    expected_guests: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    mood: Mapped[str | None] = mapped_column(String(120), nullable=True)
+    notes: Mapped[str | None] = mapped_column(Text, nullable=True)
+    readiness_percent: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    timeline_items: Mapped[list["EventTimelineItem"]] = relationship(back_populates="event", cascade="all, delete-orphan", order_by="EventTimelineItem.sort_order")
+    checklist_items: Mapped[list["EventChecklistItem"]] = relationship(back_populates="event", cascade="all, delete-orphan", order_by="EventChecklistItem.sort_order")
+    music_links: Mapped[list["EventMusicLink"]] = relationship(back_populates="event", cascade="all, delete-orphan")
+
+
+class EventTimelineItem(TimestampMixin, Base):
+    __tablename__ = "event_timeline_items"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    event_id: Mapped[int] = mapped_column(ForeignKey("events.id", ondelete="CASCADE"), index=True)
+    title: Mapped[str] = mapped_column(String(255), nullable=False)
+    start_time: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    end_time: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    sort_order: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    notes: Mapped[str | None] = mapped_column(Text, nullable=True)
+    playlist_id: Mapped[int | None] = mapped_column(ForeignKey("playlists.id", ondelete="SET NULL"), nullable=True)
+    crate_id: Mapped[int | None] = mapped_column(ForeignKey("crates.id", ondelete="SET NULL"), nullable=True)
+    event: Mapped[Event] = relationship(back_populates="timeline_items")
+
+
+class EventChecklistItem(TimestampMixin, Base):
+    __tablename__ = "event_checklist_items"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    event_id: Mapped[int] = mapped_column(ForeignKey("events.id", ondelete="CASCADE"), index=True)
+    title: Mapped[str] = mapped_column(String(255), nullable=False)
+    category: Mapped[str | None] = mapped_column(String(120), nullable=True)
+    is_done: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    sort_order: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    notes: Mapped[str | None] = mapped_column(Text, nullable=True)
+    event: Mapped[Event] = relationship(back_populates="checklist_items")
+
+
+class EventMusicLink(TimestampMixin, Base):
+    __tablename__ = "event_music_links"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    event_id: Mapped[int] = mapped_column(ForeignKey("events.id", ondelete="CASCADE"), index=True)
+    playlist_id: Mapped[int | None] = mapped_column(ForeignKey("playlists.id", ondelete="SET NULL"), nullable=True)
+    crate_id: Mapped[int | None] = mapped_column(ForeignKey("crates.id", ondelete="SET NULL"), nullable=True)
+    mix_id: Mapped[int | None] = mapped_column(ForeignKey("mixes.id", ondelete="SET NULL"), nullable=True)
+    notes: Mapped[str | None] = mapped_column(Text, nullable=True)
+    event: Mapped[Event] = relationship(back_populates="music_links")
 
 
 class DiscoveryItem(TimestampMixin, Base):

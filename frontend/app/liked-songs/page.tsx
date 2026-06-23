@@ -4,6 +4,7 @@ import { LibraryManager } from "@/components/songs/LibraryManager";
 import { Badge } from "@/components/ui/Badge";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { getFolders, getLikedSongs } from "@/lib/server-api";
+export const dynamic = "force-dynamic";
 
 export default async function LikedSongsPage() {
   const [{ data: songs, error }, { data: folders }] = await Promise.all([getLikedSongs(), getFolders()]);

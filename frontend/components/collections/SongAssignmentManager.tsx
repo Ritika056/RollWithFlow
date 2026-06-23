@@ -5,6 +5,7 @@ import { useState } from "react";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { SearchInput } from "@/components/ui/SearchInput";
 import { SongTable } from "@/components/songs/SongTable";
+import { PlayAllButton } from "@/components/player/PlayAllButton";
 import { addSongToCrate, addSongToPlaylist, removeSongFromCrate, removeSongFromPlaylist } from "@/lib/api";
 import type { Song } from "@/types/api";
 
@@ -45,6 +46,7 @@ export function SongAssignmentManager({
           <option value="">Add song...</option>
           {available.map((song) => <option key={song.id} value={song.id}>{song.title}</option>)}
         </select>
+        <PlayAllButton songs={visible} />
       </div>
       {visible.length ? <SongTable songs={visible} onLikeToggle={() => undefined} onEdit={() => undefined} onAddToFolder={() => undefined} onReject={() => undefined} onRemoveFromFolder={remove} /> : <EmptyState title="No songs here yet" description="Use the Add song selector to build this collection." />}
     </div>

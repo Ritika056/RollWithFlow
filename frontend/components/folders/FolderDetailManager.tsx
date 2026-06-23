@@ -5,6 +5,7 @@ import { useState } from "react";
 import { AddToFolderModal } from "@/components/songs/AddToFolderModal";
 import { SongFormModal } from "@/components/songs/SongFormModal";
 import { SongTable } from "@/components/songs/SongTable";
+import { PlayAllButton } from "@/components/player/PlayAllButton";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { SearchInput } from "@/components/ui/SearchInput";
 import { Toast } from "@/components/ui/Toast";
@@ -69,7 +70,7 @@ export function FolderDetailManager({ folder, initialSongs, folders }: { folder:
 
   return (
     <div className="space-y-5">
-      <SearchInput value={query} onChange={setQuery} placeholder={`Search inside ${folder.name}`} />
+      <div className="flex flex-col gap-3 md:flex-row"><SearchInput value={query} onChange={setQuery} placeholder={`Search inside ${folder.name}`} /><PlayAllButton songs={visible} onResult={flash} /></div>
       {visible.length ? (
         <SongTable songs={visible} onLikeToggle={likeToggle} onEdit={setEditing} onAddToFolder={setFolderSong} onReject={reject} onRemoveFromFolder={remove} />
       ) : (

@@ -41,6 +41,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
   const [volume, setVolumeState] = useState(0.8);
   const [repeatMode, setRepeatMode] = useState<RepeatMode>("off");
   const [shuffle, setShuffle] = useState(false);
+  const [playbackAttempt, setPlaybackAttempt] = useState(0);
 
   const isLocalPlayable = useCallback((song: Song) => song.sources.some((source) => source.type === "local" && Boolean(source.url)), []);
 
@@ -62,7 +63,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => { if (audioRef.current) audioRef.current.volume = volume; }, [volume]);
 
   const markRecent = useCallback((song: Song) => setRecentlyPlayed((current) => [song, ...current.filter((item) => item.id !== song.id)].slice(0, 20)), []);
-  const selectTrack = useCallback((song: Song) => { setCurrentTrack(song); setCurrentTime(0); setDuration(0); setErrorMessage(null); setStatus("loading"); setPlaying(true); markRecent(song); }, [markRecent]);
+  const selectTrack = useCallback((song: Song) => { setCurrentTrack(song); setPlaybackAttempt((value) => value + 1); setCurrentTime(0); setDuration(0); setErrorMessage(null); setStatus("loading"); setPlaying(true); markRecent(song); }, [markRecent]);
 
   const move = useCallback((direction: 1 | -1, fromEnded = false) => {
     if (!currentTrack || !queue.length) return false;
@@ -118,7 +119,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
     playFromQueue: (song) => selectTrack(song), cycleRepeat: () => setRepeatMode((mode) => mode === "off" ? "all" : mode === "all" ? "one" : "off"), toggleShuffle: () => setShuffle((value) => !value), isLocalPlayable,
   }), [currentTime, currentTrack, duration, errorMessage, isLocalPlayable, move, playSong, playing, queue, recentlyPlayed, repeatMode, selectTrack, shuffle, status, togglePlay, volume]);
 
-  return <PlayerContext.Provider value={value}>{children}<audio ref={audioRef} src={currentTrack ? `/api/audio/local/${currentTrack.id}` : undefined} preload="metadata" onLoadStart={() => setStatus("loading")} onCanPlay={() => setStatus(playing ? "playing" : "paused")} onTimeUpdate={(event) => setCurrentTime(event.currentTarget.currentTime)} onLoadedMetadata={(event) => setDuration(event.currentTarget.duration || 0)} onPlay={() => { setPlaying(true); setStatus("playing"); }} onPause={() => { setPlaying(false); setStatus("paused"); }} onEnded={() => { if (!move(1, true)) { setPlaying(false); setStatus("paused"); } }} onError={handleAudioError} /></PlayerContext.Provider>;
+  return <PlayerContext.Provider value={value}>{children}<audio ref={audioRef} src={currentTrack ? `/api/audio/local/${currentTrack.id}?attempt=${playbackAttempt}` : undefined} preload="metadata" onLoadStart={() => setStatus("loading")} onCanPlay={() => setStatus(playing ? "playing" : "paused")} onTimeUpdate={(event) => setCurrentTime(event.currentTarget.currentTime)} onLoadedMetadata={(event) => setDuration(event.currentTarget.duration || 0)} onPlay={() => { setPlaying(true); setStatus("playing"); }} onPause={() => { setPlaying(false); setStatus("paused"); }} onEnded={() => { if (!move(1, true)) { setPlaying(false); setStatus("paused"); } }} onError={handleAudioError} /></PlayerContext.Provider>;
 }
 
 export function usePlayer() { const context = useContext(PlayerContext); if (!context) throw new Error("usePlayer must be used inside PlayerProvider"); return context; }

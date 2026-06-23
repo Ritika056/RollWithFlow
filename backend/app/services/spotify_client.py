@@ -8,7 +8,7 @@ from urllib.error import HTTPError, URLError
 from urllib.parse import urlencode
 from urllib.request import Request, urlopen
 
-from sqlalchemy import select
+from sqlalchemy import delete, select
 from sqlalchemy.orm import Session
 
 from app.core.config import get_settings
@@ -40,7 +40,8 @@ def authorization_url(user_id: int) -> str:
         "client_id": settings.spotify_client_id,
         "response_type": "code",
         "redirect_uri": settings.spotify_redirect_uri,
-        "scope": "user-read-private",
+        "scope": "user-read-private user-read-email streaming user-read-playback-state user-modify-playback-state",
+        "show_dialog": "true",
         "state": _create_state(user_id),
     }
     return f"{SPOTIFY_ACCOUNTS_URL}/authorize?{urlencode(params)}"
@@ -59,34 +60,61 @@ def connect_callback(db: Session, code: str, state: str) -> None:
     _save_connection(db, user_id, response)
 
 
+def disconnect(db: Session, user_id: int) -> bool:
+    result = db.execute(delete(ProviderConnection).where(ProviderConnection.user_id == user_id, ProviderConnection.provider == "spotify"))
+    db.commit()
+    return bool(result.rowcount)
+
+
+def playback_credentials(db: Session, user_id: int) -> tuple[str, str]:
+    _require_configuration()
+    return get_settings().spotify_client_id or "", _access_token(db, user_id)
+
+
 def search_tracks(db: Session, user_id: int, query: str, limit: int) -> list[ProviderSearchItem]:
     token = _access_token(db, user_id)
-    payload = _request_json(
-        f"{SPOTIFY_API_URL}/search?{urlencode({'q': query, 'type': 'track', 'limit': limit})}",
-        headers={"Authorization": f"Bearer {token}"},
-    )
     items: list[ProviderSearchItem] = []
-    for track in payload.get("tracks", {}).get("items", []):
-        album = track.get("album") or {}
-        images = album.get("images") or []
-        artists = track.get("artists") or []
-        external_urls = track.get("external_urls") or {}
-        items.append(
-            ProviderSearchItem(
-                title=track.get("name") or "Untitled Spotify track",
-                artist_name=", ".join(artist.get("name", "") for artist in artists if artist.get("name")) or None,
-                platform="spotify",
-                source_url=external_urls.get("spotify"),
-                thumbnail_url=images[0].get("url") if images else None,
-                popularity_score=track.get("popularity"),
-                metadata_json={
-                    "spotify_id": track.get("id"),
-                    "album_name": album.get("name"),
-                    "duration_ms": track.get("duration_ms"),
-                    "explicit": track.get("explicit"),
-                },
-            )
+    seen: set[str] = set()
+    offset = 0
+    target = max(1, min(limit, 100))
+    # Spotify currently limits track-search pages to ten items. Keep the public
+    # RollWithFlow limit higher by collecting several valid pages.
+    spotify_page_limit = 10
+    while len(items) < target:
+        page_size = min(spotify_page_limit, target - len(items))
+        payload = _request_json(
+            f"{SPOTIFY_API_URL}/search?{urlencode({'q': query, 'type': 'track', 'limit': page_size, 'offset': offset})}",
+            headers={"Authorization": f"Bearer {token}"},
         )
+        tracks = payload.get("tracks") or {}
+        page = tracks.get("items") or []
+        if not page:
+            break
+        for track in page:
+            track_id = track.get("id")
+            if not track_id or track_id in seen:
+                continue
+            seen.add(track_id)
+            album = track.get("album") or {}
+            images = album.get("images") or []
+            artists = track.get("artists") or []
+            external_urls = track.get("external_urls") or {}
+            items.append(
+                ProviderSearchItem(
+                    title=track.get("name") or "Untitled Spotify track",
+                    artist_name=", ".join(artist.get("name", "") for artist in artists if artist.get("name")) or None,
+                    platform="spotify",
+                    source_url=external_urls.get("spotify"),
+                    thumbnail_url=images[0].get("url") if images else None,
+                    popularity_score=track.get("popularity"),
+                    metadata_json={"spotify_id": track_id, "album_name": album.get("name"), "duration_ms": track.get("duration_ms"), "explicit": track.get("explicit")},
+                )
+            )
+            if len(items) >= target:
+                break
+        offset += len(page)
+        if len(page) < page_size or not tracks.get("next"):
+            break
     return items
 
 

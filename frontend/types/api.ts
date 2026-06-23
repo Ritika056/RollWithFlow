@@ -164,6 +164,7 @@ export type Mix = {
   created_at: string;
   updated_at: string;
 };
+export type MixSong = { id: number; mix_id: number; song_id: number; position: number; cue_notes?: string | null; transition_notes?: string | null; song: Song };
 
 export type PlaylistSong = Song & {
   position?: number | null;
@@ -192,6 +193,10 @@ export type ProviderStatus = {
   youtube: { configured: boolean };
 };
 
+export type ProviderDiagnostics = ProviderStatus & {
+  spotify_redirect_uri?: string | null;
+};
+
 export type ProviderSearchItem = {
   title: string;
   artist_name?: string | null;
@@ -206,6 +211,8 @@ export type ProviderSearchItem = {
 export type ProviderSearchResponse = {
   provider: string;
   results: ProviderSearchItem[];
+  requested_count: number;
+  returned_count: number;
 };
 
 export type DiscoveryMonitor = {
@@ -233,3 +240,9 @@ export type DiscoveryFetchRun = {
   error_message?: string | null;
   metadata_json?: Record<string, unknown> | null;
 };
+
+export type EventItem = { id: number; name: string; event_type?: string | null; event_date?: string | null; venue?: string | null; client_name?: string | null; expected_guests?: number | null; mood?: string | null; notes?: string | null; readiness_percent: number; created_at: string; updated_at: string };
+export type EventTimelineItem = { id: number; event_id: number; title: string; start_time?: string | null; end_time?: string | null; sort_order: number; notes?: string | null; playlist_id?: number | null; crate_id?: number | null };
+export type EventChecklistItem = { id: number; event_id: number; title: string; category?: string | null; is_done: boolean; sort_order: number; notes?: string | null };
+export type EventMusicLink = { id: number; event_id: number; playlist_id?: number | null; crate_id?: number | null; mix_id?: number | null; notes?: string | null };
+export type AnalyticsSummary = { total_songs: number; playable_local_songs: number; provider_only_songs: number; liked_songs: number; rejected_songs: number; missing_bpm: number; missing_key: number; missing_genre: number; missing_artwork: number; top_genres: { name: string; count: number }[]; top_artists: { name: string; count: number }[]; source_breakdown: { name: string; count: number }[]; energy_distribution: { name: string; count: number }[]; rating_distribution: { name: string; count: number }[]; most_used_folders: { name: string; count: number }[]; most_used_crates: { name: string; count: number }[]; playlist_count: number; event_count: number };

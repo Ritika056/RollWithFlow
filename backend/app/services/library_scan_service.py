@@ -1,5 +1,8 @@
 import hashlib
+import os
 import re
+import shutil
+import subprocess
 from pathlib import Path
 
 from fastapi import UploadFile
@@ -15,6 +18,7 @@ from app.services.song_service import get_or_create_named
 
 
 AUDIO_EXTENSIONS = {".mp3", ".wav", ".flac", ".m4a", ".aiff", ".aif"}
+BROWSER_UNSUPPORTED_EXTENSIONS = {".aiff", ".aif"}
 MAX_REPORTED_ERRORS = 25
 UPLOAD_CHUNK_SIZE = 1024 * 1024
 MAX_UPLOAD_BYTES = 500 * 1024 * 1024
@@ -110,7 +114,8 @@ async def import_uploaded_audio(db: Session, files: list[UploadFile]) -> AudioUp
                 skipped_count += 1
                 continue
             temporary.replace(target)
-            metadata = extract_local_metadata(target)
+            playback_path, conversion_error = make_browser_playable_copy(target)
+            metadata = extract_local_metadata(playback_path)
             song = Song(
                 title=metadata["title"] or Path(filename).stem.replace("_", " ").strip() or filename,
                 duration_seconds=metadata["duration_seconds"],
@@ -124,8 +129,8 @@ async def import_uploaded_audio(db: Session, files: list[UploadFile]) -> AudioUp
                 name=filename,
                 type=SourceType.local,
                 external_id=f"sha256:{file_hash}",
-                url=target.resolve().as_posix(),
-                metadata_json={"managed_upload": True, "extension": extension, "sha256": file_hash, **metadata},
+                url=playback_path.resolve().as_posix(),
+                metadata_json={"managed_upload": True, "extension": playback_path.suffix.lower(), "original_path": target.resolve().as_posix(), "sha256": file_hash, "conversion_error": conversion_error, **metadata},
             ))
             db.add(song)
             db.commit()
@@ -163,6 +168,44 @@ def extract_local_metadata(file_path: Path) -> dict[str, str | int | None]:
         # Scanning must continue even when an individual file has unsupported tags.
         pass
     return metadata
+
+
+def make_browser_playable_copy(file_path: Path) -> tuple[Path, str | None]:
+    """Create a WAV playback copy for formats Chrome cannot decode, preserving the original upload."""
+    if file_path.suffix.lower() not in BROWSER_UNSUPPORTED_EXTENSIONS:
+        return file_path, None
+    output = file_path.with_name(f"{file_path.stem}-playable.wav")
+    if output.is_file():
+        return output, None
+    executable = ffmpeg_executable()
+    if not executable:
+        return file_path, "FFmpeg is unavailable; convert this AIFF file to WAV or MP3 for browser playback."
+    try:
+        subprocess.run(
+            [executable, "-y", "-i", str(file_path), "-vn", "-c:a", "pcm_s16le", str(output)],
+            check=True,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            timeout=120,
+        )
+    except (OSError, subprocess.SubprocessError) as error:
+        output.unlink(missing_ok=True)
+        return file_path, f"Could not convert AIFF for browser playback: {error}"
+    return output, None
+
+
+def ffmpeg_executable() -> str | None:
+    configured = get_settings().ffmpeg_path
+    if configured and Path(configured).is_file():
+        return configured
+    found = shutil.which("ffmpeg")
+    if found:
+        return found
+    local_app_data = os.environ.get("LOCALAPPDATA")
+    if local_app_data:
+        candidates = Path(local_app_data).glob("Microsoft/WinGet/Packages/Gyan.FFmpeg.Essentials_*/ffmpeg-*/bin/ffmpeg.exe")
+        return next((str(candidate) for candidate in candidates if candidate.is_file()), None)
+    return None
 
 
 def resolve_local_file(source: Source) -> tuple[Path | None, str | None]:

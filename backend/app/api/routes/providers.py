@@ -3,13 +3,16 @@ from fastapi.responses import HTMLResponse
 from sqlalchemy.orm import Session
 
 from app.api.dependencies import bearer_scheme, get_current_active_user
+from app.core.config import get_settings
 from app.core.database import get_db
 from app.models import User
 from app.schemas.common import (
+    ProviderDiagnosticsRead,
     ProviderSearchRequest,
     ProviderSearchResponse,
     ProviderStatusRead,
     SpotifyConnectResponse,
+    SpotifyPlaybackCredentials,
     SpotifyProviderStatus,
     YouTubeProviderStatus,
 )
@@ -32,6 +35,22 @@ def provider_status(
     )
 
 
+@router.get("/diagnostics", response_model=ProviderDiagnosticsRead)
+def provider_diagnostics(
+    credentials=Depends(bearer_scheme),
+    db: Session = Depends(get_db),
+) -> ProviderDiagnosticsRead:
+    current_user = get_user_from_token(db, credentials.credentials) if credentials else None
+    return ProviderDiagnosticsRead(
+        spotify=SpotifyProviderStatus(
+            configured=spotify_client.is_configured(),
+            connected=spotify_client.is_connected(db, current_user.id) if current_user else False,
+        ),
+        youtube=YouTubeProviderStatus(configured=youtube_client.is_configured()),
+        spotify_redirect_uri=get_settings().spotify_redirect_uri or None,
+    )
+
+
 @router.get("/spotify/status", response_model=SpotifyProviderStatus)
 def spotify_status(current_user: User = Depends(get_current_active_user), db: Session = Depends(get_db)) -> SpotifyProviderStatus:
     return SpotifyProviderStatus(configured=spotify_client.is_configured(), connected=spotify_client.is_connected(db, current_user.id))
@@ -41,6 +60,21 @@ def spotify_status(current_user: User = Depends(get_current_active_user), db: Se
 def spotify_connect(current_user: User = Depends(get_current_active_user)) -> SpotifyConnectResponse:
     try:
         return SpotifyConnectResponse(authorization_url=spotify_client.authorization_url(current_user.id))
+    except spotify_client.SpotifyProviderError as error:
+        raise HTTPException(status_code=409, detail=str(error)) from error
+
+
+@router.post("/spotify/disconnect")
+def spotify_disconnect(current_user: User = Depends(get_current_active_user), db: Session = Depends(get_db)) -> dict[str, str]:
+    spotify_client.disconnect(db, current_user.id)
+    return {"status": "disconnected"}
+
+
+@router.get("/spotify/playback-credentials", response_model=SpotifyPlaybackCredentials)
+def spotify_playback_credentials(current_user: User = Depends(get_current_active_user), db: Session = Depends(get_db)) -> SpotifyPlaybackCredentials:
+    try:
+        client_id, access_token = spotify_client.playback_credentials(db, current_user.id)
+        return SpotifyPlaybackCredentials(client_id=client_id, access_token=access_token)
     except spotify_client.SpotifyProviderError as error:
         raise HTTPException(status_code=409, detail=str(error)) from error
 
@@ -68,7 +102,9 @@ def spotify_callback(
 @router.post("/spotify/search", response_model=ProviderSearchResponse)
 def spotify_search(payload: ProviderSearchRequest, current_user: User = Depends(get_current_active_user), db: Session = Depends(get_db)) -> ProviderSearchResponse:
     try:
-        return ProviderSearchResponse(provider="spotify", results=spotify_client.search_tracks(db, current_user.id, payload.query, payload.limit))
+        limit = min(payload.limit, get_settings().discovery_max_limit)
+        results = spotify_client.search_tracks(db, current_user.id, payload.query, limit)
+        return ProviderSearchResponse(provider="spotify", results=results, requested_count=limit, returned_count=len(results))
     except spotify_client.SpotifyProviderError as error:
         raise HTTPException(status_code=409, detail=str(error)) from error
 
@@ -76,7 +112,9 @@ def spotify_search(payload: ProviderSearchRequest, current_user: User = Depends(
 @router.post("/youtube/search", response_model=ProviderSearchResponse)
 def youtube_search(payload: ProviderSearchRequest, current_user: User = Depends(get_current_active_user)) -> ProviderSearchResponse:
     try:
-        return ProviderSearchResponse(provider="youtube", results=youtube_client.search_videos(payload.query, payload.limit))
+        limit = min(payload.limit, get_settings().discovery_max_limit)
+        results = youtube_client.search_videos(payload.query, limit)
+        return ProviderSearchResponse(provider="youtube", results=results, requested_count=limit, returned_count=len(results))
     except youtube_client.YouTubeProviderError as error:
         raise HTTPException(status_code=409, detail=str(error)) from error
 

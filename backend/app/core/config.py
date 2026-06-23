@@ -23,8 +23,14 @@ class Settings(BaseSettings):
     spotify_client_secret: str | None = None
     spotify_redirect_uri: str | None = None
     youtube_api_key: str | None = None
+    discovery_default_limit: int = 50
+    discovery_max_limit: int = 100
+    ai_provider: str = "mock"
+    ai_api_key: str | None = None
+    ai_model: str | None = None
     media_root: Path = BASE_DIR / "media"
     audio_upload_dir: Path = BASE_DIR / "media" / "audio"
+    ffmpeg_path: str | None = None
 
     @model_validator(mode="after")
     def require_production_secret(self) -> "Settings":

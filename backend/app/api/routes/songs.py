@@ -100,6 +100,23 @@ def rescan_song_metadata(song_id: int, payload: RescanMetadataRequest, db: Sessi
     return get_song(song.id, db)
 
 
+@router.post("/songs/{song_id}/analyze-audio-basic", response_model=SongRead)
+def analyze_audio_basic(song_id: int, db: Session = Depends(get_db)) -> Song:
+    song = get_song_or_404(db, song_id)
+    source = next((item for item in song.sources if item.type == SourceType.local), None)
+    if not source:
+        raise HTTPException(status_code=400, detail="Basic analysis is available only for local audio")
+    path, error = resolve_local_file(source)
+    if error or path is None:
+        raise HTTPException(status_code=400, detail=error or "Local file is unavailable")
+    # This foundation intentionally avoids expensive BPM/key analysis libraries.
+    song.analysis_status = "completed"
+    song.waveform_status = "placeholder"
+    song.analysis_error = "BPM and key detection are planned for a future local analysis job."
+    db.commit()
+    return get_song(song.id, db)
+
+
 @router.delete("/songs/{song_id}")
 def delete_song(song_id: int, db: Session = Depends(get_db)) -> dict[str, str]:
     song = get_song_or_404(db, song_id)

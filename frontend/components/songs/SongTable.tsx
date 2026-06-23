@@ -1,6 +1,6 @@
 "use client";
 
-import { Edit3, FolderPlus, Heart, Play, RefreshCw, RotateCcw, Trash2 } from "lucide-react";
+import { Edit3, ExternalLink, FolderPlus, Heart, Play, RefreshCw, RotateCcw, Trash2 } from "lucide-react";
 
 import { usePlayer } from "@/components/player/PlayerProvider";
 import { ActionButton } from "@/components/ui/ActionButton";
@@ -150,9 +150,11 @@ function ActionStrip({
   queue: Song[];
 }) {
   const { isLocalPlayable, playSong } = usePlayer();
+  const externalSource = song.sources.find((source) => source.type === "spotify" || source.type === "youtube");
   return (
     <div className="flex flex-wrap gap-2">
       {isLocalPlayable(song) ? <ActionButton className="size-9 p-0" variant="primary" onClick={() => playSong(song, queue)} aria-label="Play local audio"><Play size={16} /></ActionButton> : null}
+      {!isLocalPlayable(song) && externalSource?.url ? <ActionButton className="size-9 p-0" variant="primary" onClick={() => window.open(externalSource.url!, "_blank", "noopener,noreferrer")} aria-label={`Open ${externalSource.type} source`}><ExternalLink size={16} /></ActionButton> : null}
       {onRescanMetadata && song.sources.some((source) => source.type === "local") ? <ActionButton className="size-9 p-0" onClick={() => onRescanMetadata(song)} aria-label="Rescan local metadata"><RefreshCw size={15} /></ActionButton> : null}
       <ActionButton className="size-9 p-0" variant={song.is_liked ? "danger" : "secondary"} onClick={() => onLikeToggle(song)} aria-label="Toggle liked"><Heart size={16} /></ActionButton>
       <ActionButton className="size-9 p-0" onClick={() => onAddToFolder(song)} aria-label="Add to folder"><FolderPlus size={16} /></ActionButton>

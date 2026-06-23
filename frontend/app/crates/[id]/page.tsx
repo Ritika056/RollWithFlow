@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { SongAssignmentManager } from "@/components/collections/SongAssignmentManager";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { getCrate, getCrateSongs, getSongs } from "@/lib/server-api";
+export const dynamic = "force-dynamic";
 
 export default async function CrateDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;

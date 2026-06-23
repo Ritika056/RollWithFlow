@@ -3,10 +3,11 @@ from datetime import UTC, datetime
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.models import DiscoveryFetchRun, DiscoveryItem, DiscoveryMonitor, DiscoveryType, Song, SourceType
+from app.models import DiscoveryFetchRun, DiscoveryItem, DiscoveryMonitor, DiscoveryType, Song, Source, SourceType, song_sources
 from app.schemas.common import DiscoveryItemWrite, ProviderSearchItem, SongWrite
 from app.services.song_service import apply_song_payload
 from app.services import spotify_client, youtube_client
+from app.core.config import get_settings
 
 
 def discovery_type(value: str) -> DiscoveryType:
@@ -31,6 +32,16 @@ def apply_discovery(item: DiscoveryItem, payload: DiscoveryItemWrite) -> Discove
 
 def save_discovery_to_library(db: Session, item: DiscoveryItem) -> Song:
     source_type = item.platform if item.platform in [source.value for source in SourceType] else "other"
+    if item.source_url:
+        existing = db.scalar(
+            select(Song)
+            .join(song_sources, Song.id == song_sources.c.song_id)
+            .join(Source, Source.id == song_sources.c.source_id)
+            .where(Source.type == SourceType(source_type), Source.url == item.source_url)
+        )
+        if existing:
+            item.is_saved = True
+            return existing
     song = Song(title=item.title, is_active=True, is_rejected=False, is_liked=False)
     db.add(song)
     apply_song_payload(
@@ -92,7 +103,7 @@ def _run_provider_monitors(db: Session, user_id: int, provider: str, monitors: l
     run = DiscoveryFetchRun(provider=provider, run_type=run_type, status="success", metadata_json={"monitor_ids": [monitor.id for monitor in monitors]})
     db.add(run)
     db.flush()
-    found = saved = 0
+    requested = found = saved = duplicates = 0
     errors: list[str] = []
     if provider not in {"mock", "spotify", "youtube"}:
         return _finish_run(db, run, status="skipped", error_message=f"Unsupported provider: {provider}")
@@ -103,23 +114,28 @@ def _run_provider_monitors(db: Session, user_id: int, provider: str, monitors: l
 
     for monitor in monitors:
         try:
-            results = _monitor_results(db, user_id, provider, monitor)
+            results, requested_count = _monitor_results(db, user_id, provider, monitor)
+            requested += requested_count
             found += len(results)
             for result in results:
                 if _save_provider_item_once(db, result, monitor):
                     saved += 1
+                else:
+                    duplicates += 1
         except (spotify_client.SpotifyProviderError, youtube_client.YouTubeProviderError) as error:
             errors.append(f"{monitor.name}: {error}")
     status = "partial" if errors and found else "failed" if errors else "success"
+    run.metadata_json = {**(run.metadata_json or {}), "requested_count": requested, "fetched_count": found, "created_count": saved, "duplicate_count": duplicates, "error_count": len(errors)}
     return _finish_run(db, run, status=status, items_found=found, items_saved=saved, error_message=" | ".join(errors) or None)
 
 
-def _monitor_results(db: Session, user_id: int, provider: str, monitor: DiscoveryMonitor) -> list[ProviderSearchItem]:
-    query = monitor.query or monitor.artist_name or monitor.genre or ("latest music" if monitor.monitor_type == "latest" else "trending music")
+def _monitor_results(db: Session, user_id: int, provider: str, monitor: DiscoveryMonitor) -> tuple[list[ProviderSearchItem], int]:
+    query = monitor.query or monitor.artist_name or monitor.genre or _preset_query(monitor.monitor_type)
+    limit = get_settings().discovery_default_limit
     if provider == "spotify":
-        return spotify_client.search_tracks(db, user_id, query, 10)
+        return spotify_client.search_tracks(db, user_id, query, limit), limit
     if provider == "youtube":
-        return youtube_client.search_videos(query, 10)
+        return youtube_client.search_videos(query, limit), limit
     return [
         ProviderSearchItem(
             title=f"Mock {monitor.name}",
@@ -130,7 +146,24 @@ def _monitor_results(db: Session, user_id: int, provider: str, monitor: Discover
             popularity_score=50.0,
             metadata_json={"monitor_id": monitor.id, "monitor_type": monitor.monitor_type},
         )
-    ]
+    ], 1
+
+
+def _preset_query(monitor_type: str) -> str:
+    presets = {
+        "latest": "latest music releases",
+        "trending": "trending music",
+        "famous": "famous hit songs",
+        "old_classics": "old classic songs",
+        "hindi": "Hindi dance music",
+        "punjabi": "Punjabi dance music",
+        "bollywood": "Bollywood party songs",
+        "edm": "EDM festival tracks",
+        "house": "house music tracks",
+        "techno": "techno tracks",
+        "hip_hop": "hip hop tracks",
+    }
+    return presets.get(monitor_type, "trending music")
 
 
 def _save_provider_item_once(db: Session, result: ProviderSearchItem, monitor: DiscoveryMonitor) -> bool:
